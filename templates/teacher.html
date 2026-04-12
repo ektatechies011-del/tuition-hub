@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Teacher Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-dark bg-dark">
+    <div class="container">
+        <span class="navbar-brand">👩‍🏫 Teacher Dashboard</span>
+        <a href="/logout" class="btn btn-warning btn-sm">Logout</a>
+    </div>
+</nav>
+
+<div class="container mt-5">
+
+    <h2 class="text-center mb-4">All Students List</h2>
+
+    <table class="table table-bordered table-hover bg-white shadow">
+
+        <thead class="table-dark text-center">
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Class</th>
+                <th>Subject</th>
+                <th>Phone</th>
+            </tr>
+        </thead>
+
+        <tbody class="text-center">
+
+            {% for student in students %}
+            <tr>
+                <td>{{ student[0] }}</td>
+                <td>{{ student[1] }}</td>
+                <td>{{ student[2] }}</td>
+                <td>{{ student[3] }}</td>
+                <td>{{ student[4] }}</td>
+            </tr>
+            {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+</body>
+</html>

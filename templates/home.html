@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Tuition Hub Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background: linear-gradient(135deg, #f4f7fb, #eaf1ff);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow-x: hidden;
+        }
+
+        .navbar-custom {
+            background: linear-gradient(90deg, #0d1b2a, #1b263b);
+            padding: 14px 0;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+        }
+
+        .navbar-brand {
+            font-size: 24px;
+            font-weight: 700;
+            color: white !important;
+        }
+
+        .nav-btn {
+            margin-left: 8px;
+            border-radius: 30px;
+            padding: 8px 18px;
+            font-weight: 500;
+            transition: 0.3s ease;
+        }
+
+        .nav-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .hero-section {
+            background: linear-gradient(135deg, #0d6efd, #6610f2, #20c997);
+            color: white;
+            border-radius: 28px;
+            padding: 60px 35px;
+            margin-top: 35px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.15);
+            position: relative;
+            overflow: hidden;
+            animation: fadeInUp 1s ease;
+        }
+
+        .hero-section::before,
+        .hero-section::after {
+            content: "";
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .hero-section::before {
+            width: 200px;
+            height: 200px;
+            top: -40px;
+            right: 40px;
+        }
+
+        .hero-section::after {
+            width: 130px;
+            height: 130px;
+            bottom: -20px;
+            left: 20px;
+            animation-delay: 2s;
+        }
+
+        .hero-title {
+            font-size: 44px;
+            font-weight: 800;
+            margin-bottom: 15px;
+        }
+
+        .hero-text {
+            font-size: 18px;
+            line-height: 1.8;
+            color: #eef5ff;
+        }
+
+        .hero-card {
+            background: rgba(255,255,255,0.14);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            padding: 28px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.14);
+        }
+
+        .mini-box {
+            background: rgba(255,255,255,0.12);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 14px;
+        }
+
+        .section-heading {
+            text-align: center;
+            font-size: 34px;
+            font-weight: 800;
+            color: #1b263b;
+            margin-bottom: 10px;
+        }
+
+        .section-sub {
+            text-align: center;
+            color: #6c757d;
+            margin-bottom: 40px;
+            font-size: 17px;
+        }
+
+        .feature-card, .quick-card, .teacher-card {
+            background: white;
+            border-radius: 24px;
+            padding: 28px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            height: 100%;
+            transition: 0.35s ease;
+        }
+
+        .feature-card:hover, .quick-card:hover, .teacher-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 26px rgba(0,0,0,0.12);
+        }
+
+        .icon-box {
+            width: 72px;
+            height: 72px;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: white;
+            margin-bottom: 18px;
+        }
+
+        .bg-blue { background: linear-gradient(135deg, #0d6efd, #3a86ff); }
+        .bg-green { background: linear-gradient(135deg, #198754, #20c997); }
+        .bg-purple { background: linear-gradient(135deg, #6f42c1, #9d4edd); }
+        .bg-orange { background: linear-gradient(135deg, #fd7e14, #ffb703); }
+
+        .teacher-icon {
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            margin: 0 auto 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            color: white;
+            background: linear-gradient(135deg, #0d6efd, #6610f2);
+        }
+
+        .cta-box {
+            background: linear-gradient(135deg, #1b263b, #415a77);
+            color: white;
+            border-radius: 28px;
+            padding: 50px 30px;
+            text-align: center;
+            box-shadow: 0 10px 28px rgba(0,0,0,0.18);
+        }
+
+        .admin-box {
+            border-radius: 18px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0px 4px 12px rgba(0,0,0,0.15);
+            transition: 0.3s;
+        }
+
+        .admin-box:hover {
+            transform: translateY(-6px);
+        }
+
+        .stat-box {
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            color: white;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.15);
+        }
+
+        .heading-box {
+            background: linear-gradient(90deg, #0d6efd, #6610f2);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+        }
+
+        .footer-box {
+            background: #0d1b2a;
+            color: #cfd8dc;
+            text-align: center;
+            padding: 18px;
+            margin-top: 50px;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-15px); }
+            100% { transform: translateY(0px); }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(35px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media(max-width: 768px) {
+            .hero-title {
+                font-size: 30px;
+            }
+
+            .hero-text {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom sticky-top">
+    <div class="container">
+        <a class="navbar-brand" href="/">🎓 Tuition Hub</a>
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="mainNav">
+            <div class="ms-auto d-flex align-items-center flex-wrap">
+                <span class="text-white me-3 fw-semibold">
+                    Welcome, {{ session['user'] }}
+                </span>
+
+                {% if session.get('role') == 'admin' %}
+                    <a href="/admin" class="btn btn-outline-light btn-sm nav-btn">Admin Panel</a>
+                    <a href="/contact" class="btn btn-info btn-sm nav-btn text-white">Add Student</a>
+                {% endif %}
+
+                {% if session.get('role') == 'student' %}
+                    <a href="/" class="btn btn-outline-light btn-sm nav-btn">Home</a>
+                    <a href="/student" class="btn btn-light btn-sm nav-btn">My Dashboard</a>
+                    <a href="/student/assistant" class="btn btn-warning btn-sm nav-btn">Study Assistant</a>
+                    <a href="/pay" class="btn btn-success btn-sm nav-btn">Pay Fee</a>
+                    <a href="/contact" class="btn btn-info btn-sm nav-btn text-white">Contact</a>
+                {% endif %}
+
+                <a href="/logout" class="btn btn-danger btn-sm nav-btn">Logout</a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+{% if session.get('role') == 'student' %}
+
+<div class="container">
+    <section class="hero-section">
+        <div class="row align-items-center">
+            <div class="col-lg-7">
+                <h1 class="hero-title">Welcome to Your Smart Tuition Portal</h1>
+                <p class="hero-text">
+                    Tuition Hub is your modern student learning platform where you can access your dashboard,
+                    assignments, tests, fee payment section, and study support in one attractive place.
+                    Learn better, stay organized, and connect with your teachers easily.
+                </p>
+
+                <div class="mt-4">
+                    <a href="/student" class="btn btn-light btn-lg me-2 mb-2">Go to Dashboard</a>
+                    <a href="/student/assistant" class="btn btn-warning btn-lg me-2 mb-2">Ask Assistant</a>
+                    <a href="/pay" class="btn btn-success btn-lg mb-2">Pay Fee</a>
+                </div>
+            </div>
+
+            <div class="col-lg-5 mt-4 mt-lg-0">
+                <div class="hero-card">
+                    <h3 class="mb-4">Student Highlights</h3>
+
+                    <div class="mini-box">
+                        <h5>📘 Assignments & Tests</h5>
+                        <p class="mb-0">Stay updated with your tasks and upcoming class work.</p>
+                    </div>
+
+                    <div class="mini-box">
+                        <h5>👩‍🏫 Teacher Guidance</h5>
+                        <p class="mb-0">Get support and communication from your tuition teacher.</p>
+                    </div>
+
+                    <div class="mini-box">
+                        <h5>💰 Easy Fee Payment</h5>
+                        <p class="mb-0">Pay tuition fee online using the built-in QR payment page.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="py-5">
+        <h2 class="section-heading">Why Choose Our Tuition Classes</h2>
+        <p class="section-sub">A professional and supportive learning environment for every student.</p>
+
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-3">
+                <div class="feature-card">
+                    <div class="icon-box bg-blue">📚</div>
+                    <h4>Structured Learning</h4>
+                    <p>Clear subject guidance, daily practice, and organized academic support.</p>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="feature-card">
+                    <div class="icon-box bg-green">📝</div>
+                    <h4>Regular Testing</h4>
+                    <p>Improve your performance through tests, revision, and discipline.</p>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="feature-card">
+                    <div class="icon-box bg-purple">📈</div>
+                    <h4>Progress Growth</h4>
+                    <p>Track better habits, strong concepts, and continuous improvement.</p>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="feature-card">
+                    <div class="icon-box bg-orange">💬</div>
+                    <h4>Quick Support</h4>
+                    <p>Reach teachers and use the student assistant whenever you need help.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="pb-5">
+        <h2 class="section-heading">Meet Our Teaching Support</h2>
+        <p class="section-sub">Guidance, attention, and motivation for better learning results.</p>
+
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="teacher-card text-center">
+                    <div class="teacher-icon">👩‍🏫</div>
+                    <h4>Experienced Teachers</h4>
+                    <p>Concept-focused teaching to help students understand and perform better.</p>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="teacher-card text-center">
+                    <div class="teacher-icon">🎯</div>
+                    <h4>Personal Attention</h4>
+                    <p>Every student gets support according to their learning pace and needs.</p>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="teacher-card text-center">
+                    <div class="teacher-icon">🌟</div>
+                    <h4>Result Oriented</h4>
+                    <p>Regular practice and revision help students improve marks and confidence.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="pb-5">
+        <h2 class="section-heading">Quick Access</h2>
+        <p class="section-sub">Use these portal buttons to move quickly through the system.</p>
+
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-3">
+                <div class="quick-card text-center">
+                    <h4>🎓 My Dashboard</h4>
+                    <p>Check your profile, assignments, tests, and fee details.</p>
+                    <a href="/student" class="btn btn-primary">Open</a>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="quick-card text-center">
+                    <h4>🤖 Study Assistant</h4>
+                    <p>Ask questions and get simple learning help instantly.</p>
+                    <a href="/student/assistant" class="btn btn-success">Open</a>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="quick-card text-center">
+                    <h4>💰 Pay Fee</h4>
+                    <p>Pay your tuition fee securely through the online QR page.</p>
+                    <a href="/pay" class="btn btn-warning">Open</a>
+                </div>
+            </div>
+
+            <div class="col-md-6 col-lg-3">
+                <div class="quick-card text-center">
+                    <h4>📞 Contact</h4>
+                    <p>Reach your teacher or tuition support for help and information.</p>
+                    <a href="/contact" class="btn btn-info text-white">Open</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="pb-4">
+        <div class="cta-box">
+            <h2 class="mb-3">Ready to Continue Learning?</h2>
+            <p class="mb-4">
+                Stay connected, complete your work on time, and keep improving with Tuition Hub.
+            </p>
+            <a href="/student" class="btn btn-light btn-lg me-2">Enter Dashboard</a>
+            <a href="/contact" class="btn btn-warning btn-lg">Contact Teacher</a>
+        </div>
+    </div>
+</div>
+
+{% endif %}
+
+{% if session.get('role') == 'admin' %}
+
+<div class="container mt-4 text-center">
+    <div class="heading-box">
+        <h2>🏠 Dashboard</h2>
+        <p>Select your panel</p>
+    </div>
+</div>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <div class="stat-box bg-primary">
+                <h3>{{ students|length if students else 0 }}</h3>
+                <p>Total Students</p>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <div class="stat-box bg-success">
+                <h3>{{ total_assignments if total_assignments else 0 }}</h3>
+                <p>Total Assignments</p>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <div class="stat-box bg-warning text-dark">
+                <h3>{{ total_tests if total_tests else 0 }}</h3>
+                <p>Total Tests</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-4 mb-4">
+            <div class="admin-box bg-primary text-white">
+                <div style="font-size:35px;">👨‍💼</div>
+                <h4>Admin Panel</h4>
+                <p>Manage students</p>
+                <a href="/admin" class="btn btn-light">Open</a>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="admin-box bg-success text-white">
+                <div style="font-size:35px;">📘</div>
+                <h4>Assignments</h4>
+                <p>Add & manage assignments</p>
+                <a href="/admin/assignments" class="btn btn-light">Open</a>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="admin-box bg-warning text-dark">
+                <div style="font-size:35px;">📝</div>
+                <h4>Tests</h4>
+                <p>Add & manage tests</p>
+                <a href="/admin/tests" class="btn btn-dark">Open</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endif %}
+
+<div class="footer-box">
+    © 2026 Tuition Hub | Professional Student Management System
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+</html>
