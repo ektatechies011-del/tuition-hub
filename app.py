@@ -84,7 +84,6 @@ def seed_users():
     conn = get_connection()
     cur = conn.cursor()
 
-    # default admin
     cur.execute("SELECT * FROM users WHERE username = ?", ("admin",))
     admin_user = cur.fetchone()
 
@@ -137,10 +136,10 @@ def health():
 
 
 # ======================
-# HOME
+# ROOT ROUTE
 # ======================
 @app.route("/")
-def home():
+def index():
     if not login_required():
         return redirect(url_for("login"))
 
@@ -148,9 +147,19 @@ def home():
         return redirect(url_for("admin"))
 
     if session.get("role") == "student":
-        return redirect(url_for("student_dashboard"))
+        return redirect(url_for("home"))
 
     return redirect(url_for("logout"))
+
+
+# ======================
+# STUDENT HOME PAGE
+# ======================
+@app.route("/home")
+def home():
+    if not student_required():
+        return redirect(url_for("login"))
+    return render_template("home.html")
 
 
 # ======================
@@ -160,6 +169,13 @@ def home():
 def login():
     ensure_database_ready()
     error = None
+
+    # agar already login hai to dubara login page na dikhao
+    if login_required():
+        if session.get("role") == "admin":
+            return redirect(url_for("admin"))
+        elif session.get("role") == "student":
+            return redirect(url_for("home"))
 
     if request.method == "POST":
         username = request.form.get("username", "").strip()
@@ -188,7 +204,7 @@ def login():
                 if user["role"] == "admin":
                     return redirect(url_for("admin"))
                 else:
-                    return redirect(url_for("student_dashboard"))
+                    return redirect(url_for("home"))
 
             error = "Invalid username or password."
             return render_template("login.html", error=error)
@@ -270,7 +286,7 @@ def submit():
 @app.route("/fix-student-users")
 def fix_student_users():
     if not admin_required():
-        return redirect(url_for("home"))
+        return redirect(url_for("login"))
 
     conn = get_connection()
     cur = conn.cursor()
