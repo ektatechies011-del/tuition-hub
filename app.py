@@ -170,7 +170,6 @@ def login():
     ensure_database_ready()
     error = None
 
-    # agar already login hai to dubara login page na dikhao
     if login_required():
         if session.get("role") == "admin":
             return redirect(url_for("admin"))
@@ -217,13 +216,34 @@ def login():
 
 
 # ======================
-# CONTACT
+# CONTACT PAGE
+# same contact.html for admin + student
+# admin -> add student form
+# student -> contact teacher details
 # ======================
 @app.route("/contact")
 def contact():
     if not login_required():
         return redirect(url_for("login"))
-    return render_template("contact.html")
+
+    teacher_name = "Ekta Ma'am"
+    teacher_phone = "6284967921"
+    whatsapp_number = "916284967921"
+    available_time = "Before 8:00 PM (Sunday after 5:00 PM)"
+    contact_note = (
+        "Please call only during the allowed time. "
+        "If one call is missed, callback will be done later. "
+        "Repeated calls are not allowed."
+    )
+
+    return render_template(
+        "contact.html",
+        teacher_name=teacher_name,
+        teacher_phone=teacher_phone,
+        whatsapp_number=whatsapp_number,
+        available_time=available_time,
+        contact_note=contact_note
+    )
 
 
 # ======================
@@ -260,6 +280,18 @@ def submit():
     cur = conn.cursor()
 
     try:
+        cur.execute("SELECT * FROM users WHERE username = ?", (username,))
+        existing_user = cur.fetchone()
+        if existing_user:
+            conn.close()
+            return "❌ Username already exists in users table"
+
+        cur.execute("SELECT * FROM students WHERE username = ?", (username,))
+        existing_student = cur.fetchone()
+        if existing_student:
+            conn.close()
+            return "❌ Username already exists in students table"
+
         cur.execute("""
             INSERT INTO students (name, class, school, joining_date, fee, phone, username)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -271,13 +303,13 @@ def submit():
         """, (username, password, "student"))
 
         conn.commit()
-
-    except sqlite3.IntegrityError:
         conn.close()
-        return "❌ Username already exists"
+        return redirect(url_for("admin"))
 
-    conn.close()
-    return redirect(url_for("admin"))
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return f"❌ Error while adding student: {str(e)}"
 
 
 # ======================
@@ -316,6 +348,27 @@ def fix_student_users():
 
 
 # ======================
+# DEBUG USERS
+# ======================
+@app.route("/debug-users")
+def debug_users():
+    if not admin_required():
+        return redirect(url_for("login"))
+
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT username, password, role FROM users ORDER BY username")
+    users = cur.fetchall()
+    conn.close()
+
+    output = "<h2>Users Table</h2><ul>"
+    for u in users:
+        output += f"<li>{u['username']} | {u['password']} | {u['role']}</li>"
+    output += "</ul>"
+    return output
+
+
+# ======================
 # ADMIN DASHBOARD
 # ======================
 @app.route("/admin")
@@ -326,8 +379,23 @@ def admin():
     conn = get_connection()
     cur = conn.cursor()
 
-    cur.execute("SELECT * FROM students")
-    students = cur.fetchall()
+    search = request.args.get("search", "").strip()
+
+    if search:
+        query = f"%{search}%"
+        cur.execute("""
+            SELECT * FROM students
+            WHERE name LIKE ?
+               OR class LIKE ?
+               OR school LIKE ?
+               OR phone LIKE ?
+               OR username LIKE ?
+               OR CAST(fee AS TEXT) LIKE ?
+        """, (query, query, query, query, query, query))
+        students = cur.fetchall()
+    else:
+        cur.execute("SELECT * FROM students")
+        students = cur.fetchall()
 
     cur.execute("SELECT COUNT(*) FROM assignments")
     total_assignments = cur.fetchone()[0]
@@ -340,6 +408,7 @@ def admin():
     return render_template(
         "admin.html",
         students=students,
+        search=search,
         total_assignments=total_assignments,
         total_tests=total_tests,
         class5=len([s for s in students if s["class"] == "5"]),
