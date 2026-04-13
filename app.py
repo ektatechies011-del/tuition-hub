@@ -2,11 +2,17 @@ from flask import Flask, render_template, request, redirect, url_for, session
 import sqlite3
 import os
 
-app = Flask(__name__)
-app.secret_key = "tuition_secret_key"
-
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "students.db")
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+
+app = Flask(
+    __name__,
+    template_folder=TEMPLATES_DIR,
+    static_folder=STATIC_DIR
+)
+app.secret_key = "tuition_secret_key"
 
 
 # ======================
@@ -78,13 +84,15 @@ def seed_users():
     conn = get_connection()
     cur = conn.cursor()
 
-    try:
+    # default admin
+    cur.execute("SELECT * FROM users WHERE username = ?", ("admin",))
+    admin_user = cur.fetchone()
+
+    if not admin_user:
         cur.execute(
             "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
             ("admin", "1234", "admin")
         )
-    except sqlite3.IntegrityError:
-        pass
 
     conn.commit()
     conn.close()
@@ -98,7 +106,6 @@ def ensure_database_ready():
     seed_users()
 
 
-# Render / production startup
 ensure_database_ready()
 
 
@@ -137,33 +144,13 @@ def home():
     if not login_required():
         return redirect(url_for("login"))
 
-    ensure_database_ready()
-
-    conn = get_connection()
-    cur = conn.cursor()
-
-    students = []
-    total_assignments = 0
-    total_tests = 0
-
     if session.get("role") == "admin":
-        cur.execute("SELECT * FROM students")
-        students = cur.fetchall()
+        return redirect(url_for("admin"))
 
-        cur.execute("SELECT COUNT(*) FROM assignments")
-        total_assignments = cur.fetchone()[0]
+    if session.get("role") == "student":
+        return redirect(url_for("student_dashboard"))
 
-        cur.execute("SELECT COUNT(*) FROM tests")
-        total_tests = cur.fetchone()[0]
-
-    conn.close()
-
-    return render_template(
-        "home.html",
-        students=students,
-        total_assignments=total_assignments,
-        total_tests=total_tests
-    )
+    return redirect(url_for("logout"))
 
 
 # ======================
@@ -186,28 +173,24 @@ def login():
             conn = get_connection()
             cur = conn.cursor()
 
-            cur.execute("SELECT * FROM users WHERE username=?", (username,))
-            existing_user = cur.fetchone()
-
-            if not existing_user:
-                conn.close()
-                error = "Username not found."
-                return render_template("login.html", error=error)
-
             cur.execute("""
-                SELECT role FROM users
-                WHERE username=? AND password=?
+                SELECT * FROM users
+                WHERE username = ? AND password = ?
             """, (username, password))
 
             user = cur.fetchone()
             conn.close()
 
             if user:
-                session["user"] = username
+                session["user"] = user["username"]
                 session["role"] = user["role"]
-                return redirect(url_for("home"))
 
-            error = "Invalid password."
+                if user["role"] == "admin":
+                    return redirect(url_for("admin"))
+                else:
+                    return redirect(url_for("student_dashboard"))
+
+            error = "Invalid username or password."
             return render_template("login.html", error=error)
 
         except Exception as e:
@@ -257,16 +240,6 @@ def submit():
     if not all([name, student_class, school, joining_date, fee, phone, username, password]):
         return "❌ All fields are required"
 
-    data = (
-        name,
-        student_class,
-        school,
-        joining_date,
-        fee,
-        phone,
-        username
-    )
-
     conn = get_connection()
     cur = conn.cursor()
 
@@ -274,12 +247,12 @@ def submit():
         cur.execute("""
             INSERT INTO students (name, class, school, joining_date, fee, phone, username)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, data)
+        """, (name, student_class, school, joining_date, fee, phone, username))
 
         cur.execute("""
             INSERT INTO users (username, password, role)
-            VALUES (?, ?, 'student')
-        """, (username, password))
+            VALUES (?, ?, ?)
+        """, (username, password, "student"))
 
         conn.commit()
 
@@ -288,7 +261,7 @@ def submit():
         return "❌ Username already exists"
 
     conn.close()
-    return redirect(url_for("contact"))
+    return redirect(url_for("admin"))
 
 
 # ======================
@@ -310,7 +283,7 @@ def fix_student_users():
     for row in student_usernames:
         username = row["username"]
 
-        cur.execute("SELECT * FROM users WHERE username=?", (username,))
+        cur.execute("SELECT * FROM users WHERE username = ?", (username,))
         existing_user = cur.fetchone()
 
         if not existing_user:
@@ -332,7 +305,7 @@ def fix_student_users():
 @app.route("/admin")
 def admin():
     if not admin_required():
-        return redirect(url_for("home"))
+        return redirect(url_for("login"))
 
     conn = get_connection()
     cur = conn.cursor()
@@ -368,24 +341,24 @@ def admin():
 @app.route("/student")
 def student_dashboard():
     if not student_required():
-        return redirect(url_for("home"))
+        return redirect(url_for("login"))
 
     username = session["user"]
 
     conn = get_connection()
     cur = conn.cursor()
 
-    cur.execute("SELECT * FROM students WHERE username=?", (username,))
+    cur.execute("SELECT * FROM students WHERE username = ?", (username,))
     student = cur.fetchone()
 
     if not student:
         conn.close()
         return "❌ Student record not found."
 
-    cur.execute("SELECT * FROM assignments WHERE class=?", (student["class"],))
+    cur.execute("SELECT * FROM assignments WHERE class = ?", (student["class"],))
     assignments = cur.fetchall()
 
-    cur.execute("SELECT * FROM tests WHERE class=?", (student["class"],))
+    cur.execute("SELECT * FROM tests WHERE class = ?", (student["class"],))
     tests = cur.fetchall()
 
     conn.close()
@@ -404,7 +377,7 @@ def student_dashboard():
 @app.route("/student/assistant", methods=["GET", "POST"])
 def student_assistant():
     if not student_required():
-        return redirect(url_for("home"))
+        return redirect(url_for("login"))
 
     answer = ""
 
