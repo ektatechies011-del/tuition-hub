@@ -90,8 +90,16 @@ def seed_users():
     conn.close()
 
 
-init_db()
-seed_users()
+# ======================
+# STARTUP
+# ======================
+def ensure_database_ready():
+    init_db()
+    seed_users()
+
+
+# Render / production startup
+ensure_database_ready()
 
 
 # ======================
@@ -110,12 +118,26 @@ def student_required():
 
 
 # ======================
+# HEALTH CHECK
+# ======================
+@app.route("/health")
+def health():
+    try:
+        ensure_database_ready()
+        return "OK"
+    except Exception as e:
+        return f"ERROR: {str(e)}", 500
+
+
+# ======================
 # HOME
 # ======================
 @app.route("/")
 def home():
     if not login_required():
         return redirect(url_for("login"))
+
+    ensure_database_ready()
 
     conn = get_connection()
     cur = conn.cursor()
@@ -149,6 +171,7 @@ def home():
 # ======================
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    ensure_database_ready()
     error = None
 
     if request.method == "POST":
@@ -159,34 +182,37 @@ def login():
             error = "Please enter both username and password."
             return render_template("login.html", error=error)
 
-        conn = get_connection()
-        cur = conn.cursor()
+        try:
+            conn = get_connection()
+            cur = conn.cursor()
 
-        # First check whether username exists
-        cur.execute("SELECT * FROM users WHERE username=?", (username,))
-        existing_user = cur.fetchone()
+            cur.execute("SELECT * FROM users WHERE username=?", (username,))
+            existing_user = cur.fetchone()
 
-        if not existing_user:
+            if not existing_user:
+                conn.close()
+                error = "Username not found."
+                return render_template("login.html", error=error)
+
+            cur.execute("""
+                SELECT role FROM users
+                WHERE username=? AND password=?
+            """, (username, password))
+
+            user = cur.fetchone()
             conn.close()
-            error = "Username not found."
+
+            if user:
+                session["user"] = username
+                session["role"] = user["role"]
+                return redirect(url_for("home"))
+
+            error = "Invalid password."
             return render_template("login.html", error=error)
 
-        # Then check password
-        cur.execute("""
-            SELECT role FROM users
-            WHERE username=? AND password=?
-        """, (username, password))
-
-        user = cur.fetchone()
-        conn.close()
-
-        if user:
-            session["user"] = username
-            session["role"] = user["role"]
-            return redirect(url_for("home"))
-
-        error = "Invalid password."
-        return render_template("login.html", error=error)
+        except Exception as e:
+            error = f"Login error: {str(e)}"
+            return render_template("login.html", error=error)
 
     return render_template("login.html", error=error)
 
@@ -410,4 +436,5 @@ def logout():
 # RUN
 # ======================
 if __name__ == "__main__":
+    ensure_database_ready()
     app.run(debug=True)
