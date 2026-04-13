@@ -39,9 +39,20 @@
 
 <body>
 
+<!-- ✅ NAVBAR ADDED -->
+<nav class="navbar navbar-dark bg-dark px-4 py-2">
+    <span class="navbar-brand fw-bold">🎓 Tuition Hub</span>
+
+    <div class="ms-auto d-flex align-items-center">
+        <span class="text-white me-3">Admin 👋</span>
+        <a href="/logout" class="btn btn-danger btn-sm">Logout</a>
+    </div>
+</nav>
+
 <div class="container mt-4">
 
-    <h2 class="text-center mb-4">🎓 Admin Dashboard</h2>
+    <!-- 🔥 Heading -->
+    <h2 class="text-center mb-4">Admin Dashboard</h2>
 
     <!-- STATS CARDS -->
     <div class="row mb-4">
@@ -163,12 +174,8 @@
                             <td>{{ row[6] }}</td>
                             <td>{{ row[7] }}</td>
                             <td>
-                                <a href="/edit/{{ row[0] }}" class="btn btn-warning btn-sm">
-                                    Edit
-                                </a>
-                                <a href="/delete/{{ row[0] }}" class="btn btn-danger btn-sm">
-                                    Delete
-                                </a>
+                                <a href="/edit/{{ row[0] }}" class="btn btn-warning btn-sm">Edit</a>
+                                <a href="/delete/{{ row[0] }}" class="btn btn-danger btn-sm">Delete</a>
                             </td>
                         </tr>
                         {% endfor %}
