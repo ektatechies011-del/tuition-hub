@@ -1,16 +1,18 @@
-from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, flash
-import sqlite3
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 import os
-from werkzeug.utils import secure_filename
+import urllib.request
+from io import BytesIO
 from datetime import datetime
 
+import psycopg2
+from psycopg2.extras import RealDictCursor
+import cloudinary
+import cloudinary.uploader
+import cloudinary.utils
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "students.db")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
-
-ASSIGNMENTS_UPLOAD_FOLDER = os.path.join(STATIC_DIR, "uploads", "assignments")
-TESTS_UPLOAD_FOLDER = os.path.join(STATIC_DIR, "uploads", "tests")
 
 ALLOWED_EXTENSIONS = {"pdf", "doc", "docx", "png", "jpg", "jpeg"}
 
@@ -21,20 +23,29 @@ app = Flask(
 )
 app.secret_key = "tuition_secret_key"
 
-app.config["ASSIGNMENTS_UPLOAD_FOLDER"] = ASSIGNMENTS_UPLOAD_FOLDER
-app.config["TESTS_UPLOAD_FOLDER"] = TESTS_UPLOAD_FOLDER
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
-os.makedirs(app.config["ASSIGNMENTS_UPLOAD_FOLDER"], exist_ok=True)
-os.makedirs(app.config["TESTS_UPLOAD_FOLDER"], exist_ok=True)
+if DATABASE_URL and "sslmode=" not in DATABASE_URL:
+    if "?" in DATABASE_URL:
+        DATABASE_URL += "&sslmode=require"
+    else:
+        DATABASE_URL += "?sslmode=require"
+
+cloudinary.config(
+    cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.environ.get("CLOUDINARY_API_KEY"),
+    api_secret=os.environ.get("CLOUDINARY_API_SECRET"),
+    secure=True
+)
 
 
 # ======================
 # DATABASE CONNECTION
 # ======================
 def get_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if not DATABASE_URL:
+        raise ValueError("DATABASE_URL is missing. Add it in Render environment variables.")
+    return psycopg2.connect(DATABASE_URL)
 
 
 # ======================
@@ -44,28 +55,127 @@ def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def unique_filename(filename):
-    safe_name = secure_filename(filename)
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    return f"{timestamp}_{safe_name}"
+def fetch_one_dict(cur):
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def fetch_all_dicts(cur):
+    rows = cur.fetchall()
+    return [dict(row) for row in rows]
 
 
 def column_exists(table_name, column_name):
     conn = get_connection()
-    cur = conn.cursor()
-    cur.execute(f"PRAGMA table_info({table_name})")
-    columns = [row[1] for row in cur.fetchall()]
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("""
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = %s AND column_name = %s
+    """, (table_name, column_name))
+    exists = cur.fetchone() is not None
+    cur.close()
     conn.close()
-    return column_name in columns
+    return exists
 
 
 def add_column_if_missing(table_name, column_name, column_type="TEXT"):
     if not column_exists(table_name, column_name):
         conn = get_connection()
         cur = conn.cursor()
-        cur.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
+        cur.execute(
+            f'ALTER TABLE "{table_name}" ADD COLUMN "{column_name}" {column_type}'
+        )
         conn.commit()
+        cur.close()
         conn.close()
+
+
+def student_to_tuple(student):
+    if not student:
+        return None
+    return (
+        student["id"],
+        student["name"],
+        student["class"],
+        student["school"],
+        student["joining_date"],
+        student["fee"],
+        student["phone"],
+        student["username"],
+    )
+
+
+def students_to_tuples(students):
+    return [student_to_tuple(s) for s in students]
+
+
+def assignments_to_tuples(assignments):
+    result = []
+    for a in assignments:
+        result.append((
+            a["id"],
+            a["title"],
+            a["subject"],
+            a["class"],
+            a["due_date"],
+            a.get("filename") or "",
+        ))
+    return result
+
+
+def tests_to_tuples(tests):
+    result = []
+    for t in tests:
+        result.append((
+            t["id"],
+            t["test_name"],
+            t["subject"],
+            t["class"],
+            t["test_date"],
+            t.get("filename") or "",
+        ))
+    return result
+
+
+def upload_to_cloudinary(file, folder_name):
+    upload_result = cloudinary.uploader.upload(
+        file,
+        resource_type="auto",
+        folder=folder_name,
+        use_filename=True,
+        unique_filename=True,
+        overwrite=False
+    )
+
+    return {
+        "file_url": upload_result.get("secure_url", ""),
+        "public_id": upload_result.get("public_id", ""),
+        "resource_type": upload_result.get("resource_type", "raw"),
+        "original_filename": file.filename
+    }
+
+
+def destroy_from_cloudinary(public_id, resource_type):
+    if public_id:
+        cloudinary.uploader.destroy(
+            public_id,
+            resource_type=resource_type or "raw",
+            invalidate=True
+        )
+
+
+def stream_download(file_url, download_name):
+    with urllib.request.urlopen(file_url) as response:
+        data = response.read()
+        content_type = response.headers.get("Content-Type", "application/octet-stream")
+
+    return send_file(
+        BytesIO(data),
+        mimetype=content_type,
+        as_attachment=True,
+        download_name=download_name or "file"
+    )
 
 
 # ======================
@@ -77,7 +187,7 @@ def init_db():
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS students (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGSERIAL PRIMARY KEY,
             name TEXT,
             class TEXT,
             school TEXT,
@@ -90,7 +200,7 @@ def init_db():
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGSERIAL PRIMARY KEY,
             username TEXT UNIQUE,
             password TEXT,
             role TEXT
@@ -99,35 +209,38 @@ def init_db():
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS assignments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGSERIAL PRIMARY KEY,
             title TEXT,
             subject TEXT,
             class TEXT,
             due_date TEXT,
-            filename TEXT,
+            file_url TEXT,
             created_at TEXT
         )
     """)
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS tests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGSERIAL PRIMARY KEY,
             test_name TEXT,
             subject TEXT,
             class TEXT,
             test_date TEXT,
-            filename TEXT,
+            file_url TEXT,
             created_at TEXT
         )
     """)
 
     conn.commit()
+    cur.close()
     conn.close()
 
-    add_column_if_missing("assignments", "filename", "TEXT")
-    add_column_if_missing("assignments", "created_at", "TEXT")
-    add_column_if_missing("tests", "filename", "TEXT")
-    add_column_if_missing("tests", "created_at", "TEXT")
+    add_column_if_missing("assignments", "original_filename", "TEXT")
+    add_column_if_missing("assignments", "public_id", "TEXT")
+    add_column_if_missing("assignments", "resource_type", "TEXT")
+    add_column_if_missing("tests", "original_filename", "TEXT")
+    add_column_if_missing("tests", "public_id", "TEXT")
+    add_column_if_missing("tests", "resource_type", "TEXT")
 
 
 # ======================
@@ -135,18 +248,21 @@ def init_db():
 # ======================
 def seed_users():
     conn = get_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute("SELECT * FROM users WHERE username = ?", ("admin",))
+    cur.execute("SELECT * FROM users WHERE username = %s", ("admin",))
     admin_user = cur.fetchone()
 
     if not admin_user:
-        cur.execute(
-            "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+        cur2 = conn.cursor()
+        cur2.execute(
+            "INSERT INTO users (username, password, role) VALUES (%s, %s, %s)",
             ("admin", "1234", "admin")
         )
+        conn.commit()
+        cur2.close()
 
-    conn.commit()
+    cur.close()
     conn.close()
 
 
@@ -239,14 +355,15 @@ def login():
 
         try:
             conn = get_connection()
-            cur = conn.cursor()
+            cur = conn.cursor(cursor_factory=RealDictCursor)
 
             cur.execute("""
                 SELECT * FROM users
-                WHERE username = ? AND password = ?
+                WHERE username = %s AND password = %s
             """, (username, password))
 
-            user = cur.fetchone()
+            user = fetch_one_dict(cur)
+            cur.close()
             conn.close()
 
             if user:
@@ -327,37 +444,43 @@ def submit():
         return "❌ All fields are required"
 
     conn = get_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
     try:
-        cur.execute("SELECT * FROM users WHERE username = ?", (username,))
-        existing_user = cur.fetchone()
+        cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+        existing_user = fetch_one_dict(cur)
         if existing_user:
+            cur.close()
             conn.close()
             return "❌ Username already exists in users table"
 
-        cur.execute("SELECT * FROM students WHERE username = ?", (username,))
-        existing_student = cur.fetchone()
+        cur.execute("SELECT * FROM students WHERE username = %s", (username,))
+        existing_student = fetch_one_dict(cur)
         if existing_student:
+            cur.close()
             conn.close()
             return "❌ Username already exists in students table"
 
-        cur.execute("""
+        cur2 = conn.cursor()
+        cur2.execute("""
             INSERT INTO students (name, class, school, joining_date, fee, phone, username)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, (name, student_class, school, joining_date, fee, phone, username))
 
-        cur.execute("""
+        cur2.execute("""
             INSERT INTO users (username, password, role)
-            VALUES (?, ?, ?)
+            VALUES (%s, %s, %s)
         """, (username, password, "student"))
 
         conn.commit()
+        cur2.close()
+        cur.close()
         conn.close()
         return redirect(url_for("admin"))
 
     except Exception as e:
         conn.rollback()
+        cur.close()
         conn.close()
         return f"❌ Error while adding student: {str(e)}"
 
@@ -371,27 +494,29 @@ def fix_student_users():
         return redirect(url_for("login"))
 
     conn = get_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
     cur.execute("SELECT username FROM students WHERE username IS NOT NULL AND username != ''")
-    student_usernames = cur.fetchall()
+    student_usernames = fetch_all_dicts(cur)
 
     added = 0
 
     for row in student_usernames:
         username = row["username"]
-
-        cur.execute("SELECT * FROM users WHERE username = ?", (username,))
-        existing_user = cur.fetchone()
+        cur.execute("SELECT * FROM users WHERE username = %s", (username,))
+        existing_user = fetch_one_dict(cur)
 
         if not existing_user:
-            cur.execute(
-                "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+            cur2 = conn.cursor()
+            cur2.execute(
+                "INSERT INTO users (username, password, role) VALUES (%s, %s, %s)",
                 (username, "1234", "student")
             )
+            cur2.close()
             added += 1
 
     conn.commit()
+    cur.close()
     conn.close()
 
     return f"✅ Fixed student users. Added {added} missing student login accounts. Default password is 1234."
@@ -406,9 +531,10 @@ def debug_users():
         return redirect(url_for("login"))
 
     conn = get_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT username, password, role FROM users ORDER BY username")
-    users = cur.fetchall()
+    users = fetch_all_dicts(cur)
+    cur.close()
     conn.close()
 
     output = "<h2>Users Table</h2><ul>"
@@ -427,7 +553,7 @@ def admin():
         return redirect(url_for("login"))
 
     conn = get_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
     search = request.args.get("search", "").strip()
 
@@ -435,25 +561,29 @@ def admin():
         query = f"%{search}%"
         cur.execute("""
             SELECT * FROM students
-            WHERE name LIKE ?
-               OR class LIKE ?
-               OR school LIKE ?
-               OR phone LIKE ?
-               OR username LIKE ?
-               OR CAST(fee AS TEXT) LIKE ?
+            WHERE name ILIKE %s
+               OR class ILIKE %s
+               OR school ILIKE %s
+               OR phone ILIKE %s
+               OR username ILIKE %s
+               OR CAST(fee AS TEXT) ILIKE %s
+            ORDER BY id
         """, (query, query, query, query, query, query))
-        students = cur.fetchall()
+        students_dict = fetch_all_dicts(cur)
     else:
-        cur.execute("SELECT * FROM students")
-        students = cur.fetchall()
+        cur.execute("SELECT * FROM students ORDER BY id")
+        students_dict = fetch_all_dicts(cur)
 
-    cur.execute("SELECT COUNT(*) FROM assignments")
-    total_assignments = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) AS total FROM assignments")
+    total_assignments = fetch_one_dict(cur)["total"]
 
-    cur.execute("SELECT COUNT(*) FROM tests")
-    total_tests = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) AS total FROM tests")
+    total_tests = fetch_one_dict(cur)["total"]
 
+    cur.close()
     conn.close()
+
+    students = students_to_tuples(students_dict)
 
     return render_template(
         "admin.html",
@@ -461,12 +591,12 @@ def admin():
         search=search,
         total_assignments=total_assignments,
         total_tests=total_tests,
-        class5=len([s for s in students if s["class"] == "5"]),
-        class6=len([s for s in students if s["class"] == "6"]),
-        class7=len([s for s in students if s["class"] == "7"]),
-        class8=len([s for s in students if s["class"] == "8"]),
-        class9=len([s for s in students if s["class"] == "9"]),
-        class10=len([s for s in students if s["class"] == "10"])
+        class5=len([s for s in students_dict if s["class"] == "5"]),
+        class6=len([s for s in students_dict if s["class"] == "6"]),
+        class7=len([s for s in students_dict if s["class"] == "7"]),
+        class8=len([s for s in students_dict if s["class"] == "8"]),
+        class9=len([s for s in students_dict if s["class"] == "9"]),
+        class10=len([s for s in students_dict if s["class"] == "10"])
     )
 
 
@@ -479,7 +609,7 @@ def admin_assignments():
         return redirect(url_for("login"))
 
     conn = get_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
     if request.method == "POST":
         title = request.form.get("title", "").strip()
@@ -490,28 +620,62 @@ def admin_assignments():
 
         if not title or not subject or not student_class or not due_date:
             flash("Please fill all fields.", "danger")
+            cur.close()
+            conn.close()
             return redirect(url_for("admin_assignments"))
 
-        filename = ""
+        uploaded = {
+            "file_url": "",
+            "public_id": "",
+            "resource_type": "",
+            "original_filename": ""
+        }
+
         if file and file.filename:
             if not allowed_file(file.filename):
                 flash("Invalid file type. Allowed: pdf, doc, docx, png, jpg, jpeg", "danger")
+                cur.close()
+                conn.close()
                 return redirect(url_for("admin_assignments"))
 
-            filename = unique_filename(file.filename)
-            file.save(os.path.join(app.config["ASSIGNMENTS_UPLOAD_FOLDER"], filename))
+            uploaded = upload_to_cloudinary(file, "tuition_hub/assignments")
 
-        cur.execute("""
-            INSERT INTO assignments (title, subject, class, due_date, filename, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (title, subject, student_class, due_date, filename, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        cur2 = conn.cursor()
+        cur2.execute("""
+            INSERT INTO assignments (
+                title, subject, class, due_date, file_url, created_at,
+                original_filename, public_id, resource_type
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            title,
+            subject,
+            student_class,
+            due_date,
+            uploaded["file_url"],
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            uploaded["original_filename"],
+            uploaded["public_id"],
+            uploaded["resource_type"]
+        ))
 
         conn.commit()
+        cur2.close()
         flash("Assignment added successfully.", "success")
+        cur.close()
+        conn.close()
         return redirect(url_for("admin_assignments"))
 
-    cur.execute("SELECT * FROM assignments ORDER BY id DESC")
-    assignments = cur.fetchall()
+    cur.execute("""
+        SELECT
+            id, title, subject, class, due_date,
+            COALESCE(original_filename, '') AS filename,
+            created_at
+        FROM assignments
+        ORDER BY id DESC
+    """)
+    assignments = fetch_all_dicts(cur)
+    cur.close()
     conn.close()
 
     return render_template("admin_assignments.html", assignments=assignments)
@@ -526,7 +690,7 @@ def admin_tests():
         return redirect(url_for("login"))
 
     conn = get_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
     if request.method == "POST":
         test_name = request.form.get("test_name", "").strip()
@@ -537,28 +701,62 @@ def admin_tests():
 
         if not test_name or not subject or not student_class or not test_date:
             flash("Please fill all fields.", "danger")
+            cur.close()
+            conn.close()
             return redirect(url_for("admin_tests"))
 
-        filename = ""
+        uploaded = {
+            "file_url": "",
+            "public_id": "",
+            "resource_type": "",
+            "original_filename": ""
+        }
+
         if file and file.filename:
             if not allowed_file(file.filename):
                 flash("Invalid file type. Allowed: pdf, doc, docx, png, jpg, jpeg", "danger")
+                cur.close()
+                conn.close()
                 return redirect(url_for("admin_tests"))
 
-            filename = unique_filename(file.filename)
-            file.save(os.path.join(app.config["TESTS_UPLOAD_FOLDER"], filename))
+            uploaded = upload_to_cloudinary(file, "tuition_hub/tests")
 
-        cur.execute("""
-            INSERT INTO tests (test_name, subject, class, test_date, filename, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (test_name, subject, student_class, test_date, filename, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        cur2 = conn.cursor()
+        cur2.execute("""
+            INSERT INTO tests (
+                test_name, subject, class, test_date, file_url, created_at,
+                original_filename, public_id, resource_type
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            test_name,
+            subject,
+            student_class,
+            test_date,
+            uploaded["file_url"],
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            uploaded["original_filename"],
+            uploaded["public_id"],
+            uploaded["resource_type"]
+        ))
 
         conn.commit()
+        cur2.close()
         flash("Test added successfully.", "success")
+        cur.close()
+        conn.close()
         return redirect(url_for("admin_tests"))
 
-    cur.execute("SELECT * FROM tests ORDER BY id DESC")
-    tests = cur.fetchall()
+    cur.execute("""
+        SELECT
+            id, test_name, subject, class, test_date,
+            COALESCE(original_filename, '') AS filename,
+            created_at
+        FROM tests
+        ORDER BY id DESC
+    """)
+    tests = fetch_all_dicts(cur)
+    cur.close()
     conn.close()
 
     return render_template("admin_tests.html", tests=tests)
@@ -575,28 +773,44 @@ def student_dashboard():
     username = session["user"]
 
     conn = get_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute("SELECT * FROM students WHERE username = ?", (username,))
-    student = cur.fetchone()
+    cur.execute("SELECT * FROM students WHERE username = %s", (username,))
+    student_dict = fetch_one_dict(cur)
 
-    if not student:
+    if not student_dict:
+        cur.close()
         conn.close()
         return "❌ Student record not found."
 
-    cur.execute("SELECT * FROM assignments WHERE class = ? ORDER BY id DESC", (student["class"],))
-    assignments = cur.fetchall()
+    cur.execute("""
+        SELECT
+            id, title, subject, class, due_date,
+            COALESCE(original_filename, '') AS filename
+        FROM assignments
+        WHERE class = %s
+        ORDER BY id DESC
+    """, (student_dict["class"],))
+    assignments_dict = fetch_all_dicts(cur)
 
-    cur.execute("SELECT * FROM tests WHERE class = ? ORDER BY id DESC", (student["class"],))
-    tests = cur.fetchall()
+    cur.execute("""
+        SELECT
+            id, test_name, subject, class, test_date,
+            COALESCE(original_filename, '') AS filename
+        FROM tests
+        WHERE class = %s
+        ORDER BY id DESC
+    """, (student_dict["class"],))
+    tests_dict = fetch_all_dicts(cur)
 
+    cur.close()
     conn.close()
 
     return render_template(
         "student.html",
-        student=student,
-        assignments=assignments,
-        tests=tests
+        student=student_to_tuple(student_dict),
+        assignments=assignments_to_tuples(assignments_dict),
+        tests=tests_to_tuples(tests_dict)
     )
 
 
@@ -611,21 +825,27 @@ def student_assignments():
     username = session["user"]
 
     conn = get_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute("SELECT * FROM students WHERE username = ?", (username,))
-    student = cur.fetchone()
+    cur.execute("SELECT * FROM students WHERE username = %s", (username,))
+    student = fetch_one_dict(cur)
 
     if not student:
+        cur.close()
         conn.close()
         return "❌ Student record not found."
 
     cur.execute("""
-        SELECT * FROM assignments
-        WHERE class = ?
+        SELECT
+            id, title, subject, class, due_date,
+            COALESCE(original_filename, '') AS filename
+        FROM assignments
+        WHERE class = %s
         ORDER BY id DESC
     """, (student["class"],))
-    assignments = cur.fetchall()
+    assignments = fetch_all_dicts(cur)
+
+    cur.close()
     conn.close()
 
     return render_template("student_assignments.html", student=student, assignments=assignments)
@@ -642,21 +862,27 @@ def student_tests():
     username = session["user"]
 
     conn = get_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute("SELECT * FROM students WHERE username = ?", (username,))
-    student = cur.fetchone()
+    cur.execute("SELECT * FROM students WHERE username = %s", (username,))
+    student = fetch_one_dict(cur)
 
     if not student:
+        cur.close()
         conn.close()
         return "❌ Student record not found."
 
     cur.execute("""
-        SELECT * FROM tests
-        WHERE class = ?
+        SELECT
+            id, test_name, subject, class, test_date,
+            COALESCE(original_filename, '') AS filename
+        FROM tests
+        WHERE class = %s
         ORDER BY id DESC
     """, (student["class"],))
-    tests = cur.fetchall()
+    tests = fetch_all_dicts(cur)
+
+    cur.close()
     conn.close()
 
     return render_template("student_tests.html", student=student, tests=tests)
@@ -665,35 +891,91 @@ def student_tests():
 # ======================
 # VIEW FILES
 # ======================
-@app.route("/view/assignment/<filename>")
-def view_assignment(filename):
+@app.route("/view/assignment/<int:assignment_id>")
+def view_assignment(assignment_id):
     if not login_required():
         return redirect(url_for("login"))
-    return send_from_directory(app.config["ASSIGNMENTS_UPLOAD_FOLDER"], filename)
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT file_url FROM assignments WHERE id = %s", (assignment_id,))
+    assignment = fetch_one_dict(cur)
+    cur.close()
+    conn.close()
+
+    if not assignment or not assignment.get("file_url"):
+        flash("File not found.", "danger")
+        return redirect(url_for("admin_assignments") if session.get("role") == "admin" else url_for("student_dashboard"))
+
+    return redirect(assignment["file_url"])
 
 
-@app.route("/view/test/<filename>")
-def view_test(filename):
+@app.route("/view/test/<int:test_id>")
+def view_test(test_id):
     if not login_required():
         return redirect(url_for("login"))
-    return send_from_directory(app.config["TESTS_UPLOAD_FOLDER"], filename)
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT file_url FROM tests WHERE id = %s", (test_id,))
+    test = fetch_one_dict(cur)
+    cur.close()
+    conn.close()
+
+    if not test or not test.get("file_url"):
+        flash("File not found.", "danger")
+        return redirect(url_for("admin_tests") if session.get("role") == "admin" else url_for("student_dashboard"))
+
+    return redirect(test["file_url"])
 
 
 # ======================
 # DOWNLOAD FILES
 # ======================
-@app.route("/download/assignment/<filename>")
-def download_assignment(filename):
+@app.route("/download/assignment/<int:assignment_id>")
+def download_assignment(assignment_id):
     if not login_required():
         return redirect(url_for("login"))
-    return send_from_directory(app.config["ASSIGNMENTS_UPLOAD_FOLDER"], filename, as_attachment=True)
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("""
+        SELECT file_url, COALESCE(original_filename, 'assignment_file') AS original_filename
+        FROM assignments
+        WHERE id = %s
+    """, (assignment_id,))
+    assignment = fetch_one_dict(cur)
+    cur.close()
+    conn.close()
+
+    if not assignment or not assignment.get("file_url"):
+        flash("File not found.", "danger")
+        return redirect(url_for("admin_assignments") if session.get("role") == "admin" else url_for("student_dashboard"))
+
+    return stream_download(assignment["file_url"], assignment["original_filename"])
 
 
-@app.route("/download/test/<filename>")
-def download_test(filename):
+@app.route("/download/test/<int:test_id>")
+def download_test(test_id):
     if not login_required():
         return redirect(url_for("login"))
-    return send_from_directory(app.config["TESTS_UPLOAD_FOLDER"], filename, as_attachment=True)
+
+    conn = get_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("""
+        SELECT file_url, COALESCE(original_filename, 'test_file') AS original_filename
+        FROM tests
+        WHERE id = %s
+    """, (test_id,))
+    test = fetch_one_dict(cur)
+    cur.close()
+    conn.close()
+
+    if not test or not test.get("file_url"):
+        flash("File not found.", "danger")
+        return redirect(url_for("admin_tests") if session.get("role") == "admin" else url_for("student_dashboard"))
+
+    return stream_download(test["file_url"], test["original_filename"])
 
 
 # ======================
@@ -705,22 +987,25 @@ def delete_assignment(assignment_id):
         return redirect(url_for("login"))
 
     conn = get_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute("SELECT * FROM assignments WHERE id = ?", (assignment_id,))
-    assignment = cur.fetchone()
+    cur.execute("""
+        SELECT public_id, resource_type
+        FROM assignments
+        WHERE id = %s
+    """, (assignment_id,))
+    assignment = fetch_one_dict(cur)
 
     if assignment:
-        filename = assignment["filename"]
-        if filename:
-            file_path = os.path.join(app.config["ASSIGNMENTS_UPLOAD_FOLDER"], filename)
-            if os.path.exists(file_path):
-                os.remove(file_path)
+        destroy_from_cloudinary(assignment.get("public_id"), assignment.get("resource_type"))
 
-        cur.execute("DELETE FROM assignments WHERE id = ?", (assignment_id,))
+        cur2 = conn.cursor()
+        cur2.execute("DELETE FROM assignments WHERE id = %s", (assignment_id,))
         conn.commit()
+        cur2.close()
         flash("Assignment deleted successfully.", "success")
 
+    cur.close()
     conn.close()
     return redirect(url_for("admin_assignments"))
 
@@ -734,22 +1019,25 @@ def delete_test(test_id):
         return redirect(url_for("login"))
 
     conn = get_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute("SELECT * FROM tests WHERE id = ?", (test_id,))
-    test = cur.fetchone()
+    cur.execute("""
+        SELECT public_id, resource_type
+        FROM tests
+        WHERE id = %s
+    """, (test_id,))
+    test = fetch_one_dict(cur)
 
     if test:
-        filename = test["filename"]
-        if filename:
-            file_path = os.path.join(app.config["TESTS_UPLOAD_FOLDER"], filename)
-            if os.path.exists(file_path):
-                os.remove(file_path)
+        destroy_from_cloudinary(test.get("public_id"), test.get("resource_type"))
 
-        cur.execute("DELETE FROM tests WHERE id = ?", (test_id,))
+        cur2 = conn.cursor()
+        cur2.execute("DELETE FROM tests WHERE id = %s", (test_id,))
         conn.commit()
+        cur2.close()
         flash("Test deleted successfully.", "success")
 
+    cur.close()
     conn.close()
     return redirect(url_for("admin_tests"))
 

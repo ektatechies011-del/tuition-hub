@@ -58,8 +58,8 @@
                             </td>
                             <td>
                                 {% if a.filename %}
-                                    <a href="{{ url_for('view_assignment', filename=a.filename) }}" target="_blank" class="btn btn-sm btn-info">View</a>
-                                    <a href="{{ url_for('download_assignment', filename=a.filename) }}" class="btn btn-sm btn-success">Download</a>
+                                    <a href="{{ url_for('view_assignment', assignment_id=a.id) }}" target="_blank" class="btn btn-sm btn-info">View</a>
+                                    <a href="{{ url_for('download_assignment', assignment_id=a.id) }}" class="btn btn-sm btn-success">Download</a>
                                 {% else %}
                                     <span class="text-muted">No file</span>
                                 {% endif %}
