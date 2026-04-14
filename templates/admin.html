@@ -24,6 +24,19 @@
         .bg5 { background: #f7971e; }
         .bg6 { background: #8e44ad; }
 
+        .feature-card {
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            background: white;
+            box-shadow: 0px 4px 12px rgba(0,0,0,0.1);
+            transition: 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+
         .table-box {
             background: white;
             padding: 20px;
@@ -39,161 +52,199 @@
 
 <body>
 
-    <nav class="navbar navbar-dark bg-dark px-4 py-2 mb-3">
-        <span class="navbar-brand fw-bold">🎓 Tuition Hub</span>
+<!-- NAVBAR -->
+<nav class="navbar navbar-dark bg-dark px-4 py-2 mb-3">
+    <span class="navbar-brand fw-bold">🎓 Tuition Hub</span>
 
-        <div class="ms-auto d-flex align-items-center gap-2">
-            <span class="text-white me-2">Admin 👋</span>
+    <div class="ms-auto d-flex align-items-center gap-2">
+        <span class="text-white me-2">Admin 👋</span>
 
-            <a href="/contact" class="btn btn-success btn-sm">
-                ➕ Add Student
-            </a>
+        <a href="/contact" class="btn btn-success btn-sm">
+            ➕ Add Student
+        </a>
 
-            <a href="/logout" class="btn btn-danger btn-sm">
-                Logout
-            </a>
-        </div>
-    </nav>
+        <!-- SIMPLE BUTTONS -->
+        <a href="{{ url_for('admin_assignments') }}" class="btn btn-primary btn-sm">
+            Assignments
+        </a>
 
-    <div class="container mt-4">
+        <a href="{{ url_for('admin_tests') }}" class="btn btn-success btn-sm">
+            Tests
+        </a>
 
-        <h2 class="text-center mb-4">Admin Dashboard</h2>
+        <a href="/logout" class="btn btn-danger btn-sm">
+            Logout
+        </a>
+    </div>
+</nav>
 
-        <div class="row mb-4">
+<div class="container mt-4">
 
-            <div class="col-md-4 mb-3">
-                <div class="card-box bg1">
-                    <h3>{{ students|length }}</h3>
-                    <p>Total Students</p>
-                </div>
+    <h2 class="text-center mb-4">Admin Dashboard</h2>
+
+    <!-- ================= STATS CARDS ================= -->
+    <div class="row mb-4">
+
+        <div class="col-md-4 mb-3">
+            <div class="card-box bg1">
+                <h3>{{ students|length }}</h3>
+                <p>Total Students</p>
             </div>
-
-            <div class="col-md-4 mb-3">
-                <div class="card-box bg2">
-                    <h3>{{ class5 }}</h3>
-                    <p>Class 5</p>
-                </div>
-            </div>
-
-            <div class="col-md-4 mb-3">
-                <div class="card-box bg3">
-                    <h3>{{ class6 }}</h3>
-                    <p>Class 6</p>
-                </div>
-            </div>
-
-            <div class="col-md-4 mb-3">
-                <div class="card-box bg4">
-                    <h3>{{ class7 }}</h3>
-                    <p>Class 7</p>
-                </div>
-            </div>
-
-            <div class="col-md-4 mb-3">
-                <div class="card-box bg5">
-                    <h3>{{ class8 }}</h3>
-                    <p>Class 8</p>
-                </div>
-            </div>
-
-            <div class="col-md-4 mb-3">
-                <div class="card-box bg6">
-                    <h3>{{ class9 }}</h3>
-                    <p>Class 9</p>
-                </div>
-            </div>
-
-            <div class="col-md-4 mb-3">
-                <div class="card-box bg1">
-                    <h3>{{ class10 }}</h3>
-                    <p>Class 10</p>
-                </div>
-            </div>
-
-            <div class="col-md-4 mb-3">
-                <div class="card-box bg4">
-                    <h3>{{ total_assignments }}</h3>
-                    <p>Total Assignments</p>
-                </div>
-            </div>
-
-            <div class="col-md-4 mb-3">
-                <div class="card-box bg5">
-                    <h3>{{ total_tests }}</h3>
-                    <p>Total Tests</p>
-                </div>
-            </div>
-
         </div>
 
-        <form method="GET" action="/admin" class="mb-4">
-            <div class="input-group shadow-sm">
-                <input
-                    type="text"
-                    name="search"
-                    class="form-control"
-                    placeholder="🔍 Search by name, class, school, fee, phone, username..."
-                    value="{{ search if search else '' }}"
-                >
-
-                <button type="submit" class="btn btn-primary">
-                    Search
-                </button>
-
-                <a href="/admin" class="btn btn-secondary">
-                    Reset
-                </a>
+        <div class="col-md-4 mb-3">
+            <div class="card-box bg2">
+                <h3>{{ class5 }}</h3>
+                <p>Class 5</p>
             </div>
-        </form>
+        </div>
 
-        <div class="table-box">
-            <div class="table-responsive">
-                <table class="table table-hover table-bordered align-middle">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Class</th>
-                            <th>School</th>
-                            <th>Joining Date</th>
-                            <th>Fee</th>
-                            <th>Phone</th>
-                            <th>Username</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
+        <div class="col-md-4 mb-3">
+            <div class="card-box bg3">
+                <h3>{{ class6 }}</h3>
+                <p>Class 6</p>
+            </div>
+        </div>
 
-                    <tbody>
-                        {% if students %}
-                            {% for row in students %}
-                            <tr>
-                                <td>{{ row[0] }}</td>
-                                <td>{{ row[1] }}</td>
-                                <td>{{ row[2] }}</td>
-                                <td>{{ row[3] }}</td>
-                                <td>{{ row[4] }}</td>
-                                <td>₹{{ row[5] }}</td>
-                                <td>{{ row[6] }}</td>
-                                <td>{{ row[7] }}</td>
-                                <td>
-                                    <a href="/edit/{{ row[0] }}" class="btn btn-warning btn-sm">Edit</a>
-                                    <a href="/delete/{{ row[0] }}" class="btn btn-danger btn-sm">Delete</a>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr>
-                                <td colspan="9" class="text-center text-muted py-4">
-                                    No students found
-                                </td>
-                            </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
+        <div class="col-md-4 mb-3">
+            <div class="card-box bg4">
+                <h3>{{ class7 }}</h3>
+                <p>Class 7</p>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <div class="card-box bg5">
+                <h3>{{ class8 }}</h3>
+                <p>Class 8</p>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <div class="card-box bg6">
+                <h3>{{ class9 }}</h3>
+                <p>Class 9</p>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <div class="card-box bg1">
+                <h3>{{ class10 }}</h3>
+                <p>Class 10</p>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <div class="card-box bg4">
+                <h3>{{ total_assignments }}</h3>
+                <p>Total Assignments</p>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-3">
+            <div class="card-box bg5">
+                <h3>{{ total_tests }}</h3>
+                <p>Total Tests</p>
             </div>
         </div>
 
     </div>
+
+    <!-- ================= FEATURE CARDS ================= -->
+    <h4 class="mb-3">Quick Actions</h4>
+
+    <div class="row mb-4">
+
+        <div class="col-md-6 mb-3">
+            <a href="{{ url_for('admin_assignments') }}" class="text-decoration-none">
+                <div class="feature-card">
+                    <h4>📚 Manage Assignments</h4>
+                    <p>Add, view, download and delete assignments</p>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <a href="{{ url_for('admin_tests') }}" class="text-decoration-none">
+                <div class="feature-card">
+                    <h4>📝 Manage Tests</h4>
+                    <p>Add, view, download and delete tests</p>
+                </div>
+            </a>
+        </div>
+
+    </div>
+
+    <!-- ================= SEARCH ================= -->
+    <form method="GET" action="/admin" class="mb-4">
+        <div class="input-group shadow-sm">
+            <input
+                type="text"
+                name="search"
+                class="form-control"
+                placeholder="🔍 Search by name, class, school, fee, phone, username..."
+                value="{{ search if search else '' }}"
+            >
+
+            <button type="submit" class="btn btn-primary">
+                Search
+            </button>
+
+            <a href="/admin" class="btn btn-secondary">
+                Reset
+            </a>
+        </div>
+    </form>
+
+    <!-- ================= TABLE ================= -->
+    <div class="table-box">
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Class</th>
+                        <th>School</th>
+                        <th>Joining Date</th>
+                        <th>Fee</th>
+                        <th>Phone</th>
+                        <th>Username</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% if students %}
+                        {% for row in students %}
+                        <tr>
+                            <td>{{ row[0] }}</td>
+                            <td>{{ row[1] }}</td>
+                            <td>{{ row[2] }}</td>
+                            <td>{{ row[3] }}</td>
+                            <td>{{ row[4] }}</td>
+                            <td>₹{{ row[5] }}</td>
+                            <td>{{ row[6] }}</td>
+                            <td>{{ row[7] }}</td>
+                            <td>
+                                <a href="/edit/{{ row[0] }}" class="btn btn-warning btn-sm">Edit</a>
+                                <a href="/delete/{{ row[0] }}" class="btn btn-danger btn-sm">Delete</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center text-muted py-4">
+                                No students found
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
 
 </body>
 </html>

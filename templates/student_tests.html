@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Tests</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body{
+            background: #f4f7fb;
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .main-box{
+            background: white;
+            border-radius: 18px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            padding: 30px;
+        }
+        .heading{
+            font-weight: 700;
+            color: #1b263b;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container py-5">
+    <div class="main-box">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="heading">My Tests - Class {{ student.class }}</h2>
+            <a href="{{ url_for('student_dashboard') }}" class="btn btn-dark">Back</a>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Test Name</th>
+                        <th>Subject</th>
+                        <th>Test Date</th>
+                        <th>File</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if tests %}
+                        {% for t in tests %}
+                        <tr>
+                            <td>{{ t.test_name }}</td>
+                            <td>{{ t.subject }}</td>
+                            <td>{{ t.test_date }}</td>
+                            <td>
+                                {% if t.filename %}
+                                    {{ t.filename }}
+                                {% else %}
+                                    No file
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if t.filename %}
+                                    <a href="{{ url_for('view_test', filename=t.filename) }}" target="_blank" class="btn btn-sm btn-info">View</a>
+                                    <a href="{{ url_for('download_test', filename=t.filename) }}" class="btn btn-sm btn-success">Download</a>
+                                {% else %}
+                                    <span class="text-muted">No file</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center">No tests available.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

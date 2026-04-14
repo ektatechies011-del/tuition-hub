@@ -1,11 +1,18 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, send_from_directory, flash
 import sqlite3
 import os
+from werkzeug.utils import secure_filename
+from datetime import datetime
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "students.db")
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
+
+ASSIGNMENTS_UPLOAD_FOLDER = os.path.join(STATIC_DIR, "uploads", "assignments")
+TESTS_UPLOAD_FOLDER = os.path.join(STATIC_DIR, "uploads", "tests")
+
+ALLOWED_EXTENSIONS = {"pdf", "doc", "docx", "png", "jpg", "jpeg"}
 
 app = Flask(
     __name__,
@@ -13,6 +20,12 @@ app = Flask(
     static_folder=STATIC_DIR
 )
 app.secret_key = "tuition_secret_key"
+
+app.config["ASSIGNMENTS_UPLOAD_FOLDER"] = ASSIGNMENTS_UPLOAD_FOLDER
+app.config["TESTS_UPLOAD_FOLDER"] = TESTS_UPLOAD_FOLDER
+
+os.makedirs(app.config["ASSIGNMENTS_UPLOAD_FOLDER"], exist_ok=True)
+os.makedirs(app.config["TESTS_UPLOAD_FOLDER"], exist_ok=True)
 
 
 # ======================
@@ -22,6 +35,37 @@ def get_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+# ======================
+# HELPERS
+# ======================
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def unique_filename(filename):
+    safe_name = secure_filename(filename)
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    return f"{timestamp}_{safe_name}"
+
+
+def column_exists(table_name, column_name):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute(f"PRAGMA table_info({table_name})")
+    columns = [row[1] for row in cur.fetchall()]
+    conn.close()
+    return column_name in columns
+
+
+def add_column_if_missing(table_name, column_name, column_type="TEXT"):
+    if not column_exists(table_name, column_name):
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
+        conn.commit()
+        conn.close()
 
 
 # ======================
@@ -59,7 +103,9 @@ def init_db():
             title TEXT,
             subject TEXT,
             class TEXT,
-            due_date TEXT
+            due_date TEXT,
+            filename TEXT,
+            created_at TEXT
         )
     """)
 
@@ -69,12 +115,19 @@ def init_db():
             test_name TEXT,
             subject TEXT,
             class TEXT,
-            test_date TEXT
+            test_date TEXT,
+            filename TEXT,
+            created_at TEXT
         )
     """)
 
     conn.commit()
     conn.close()
+
+    add_column_if_missing("assignments", "filename", "TEXT")
+    add_column_if_missing("assignments", "created_at", "TEXT")
+    add_column_if_missing("tests", "filename", "TEXT")
+    add_column_if_missing("tests", "created_at", "TEXT")
 
 
 # ======================
@@ -109,7 +162,7 @@ ensure_database_ready()
 
 
 # ======================
-# HELPERS
+# AUTH HELPERS
 # ======================
 def login_required():
     return "role" in session and "user" in session
@@ -217,9 +270,6 @@ def login():
 
 # ======================
 # CONTACT PAGE
-# same contact.html for admin + student
-# admin -> add student form
-# student -> contact teacher details
 # ======================
 @app.route("/contact")
 def contact():
@@ -421,6 +471,100 @@ def admin():
 
 
 # ======================
+# ADMIN ASSIGNMENTS PAGE
+# ======================
+@app.route("/admin/assignments", methods=["GET", "POST"])
+def admin_assignments():
+    if not admin_required():
+        return redirect(url_for("login"))
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    if request.method == "POST":
+        title = request.form.get("title", "").strip()
+        subject = request.form.get("subject", "").strip()
+        student_class = request.form.get("class", "").strip()
+        due_date = request.form.get("due_date", "").strip()
+        file = request.files.get("file")
+
+        if not title or not subject or not student_class or not due_date:
+            flash("Please fill all fields.", "danger")
+            return redirect(url_for("admin_assignments"))
+
+        filename = ""
+        if file and file.filename:
+            if not allowed_file(file.filename):
+                flash("Invalid file type. Allowed: pdf, doc, docx, png, jpg, jpeg", "danger")
+                return redirect(url_for("admin_assignments"))
+
+            filename = unique_filename(file.filename)
+            file.save(os.path.join(app.config["ASSIGNMENTS_UPLOAD_FOLDER"], filename))
+
+        cur.execute("""
+            INSERT INTO assignments (title, subject, class, due_date, filename, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (title, subject, student_class, due_date, filename, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+
+        conn.commit()
+        flash("Assignment added successfully.", "success")
+        return redirect(url_for("admin_assignments"))
+
+    cur.execute("SELECT * FROM assignments ORDER BY id DESC")
+    assignments = cur.fetchall()
+    conn.close()
+
+    return render_template("admin_assignments.html", assignments=assignments)
+
+
+# ======================
+# ADMIN TESTS PAGE
+# ======================
+@app.route("/admin/tests", methods=["GET", "POST"])
+def admin_tests():
+    if not admin_required():
+        return redirect(url_for("login"))
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    if request.method == "POST":
+        test_name = request.form.get("test_name", "").strip()
+        subject = request.form.get("subject", "").strip()
+        student_class = request.form.get("class", "").strip()
+        test_date = request.form.get("test_date", "").strip()
+        file = request.files.get("file")
+
+        if not test_name or not subject or not student_class or not test_date:
+            flash("Please fill all fields.", "danger")
+            return redirect(url_for("admin_tests"))
+
+        filename = ""
+        if file and file.filename:
+            if not allowed_file(file.filename):
+                flash("Invalid file type. Allowed: pdf, doc, docx, png, jpg, jpeg", "danger")
+                return redirect(url_for("admin_tests"))
+
+            filename = unique_filename(file.filename)
+            file.save(os.path.join(app.config["TESTS_UPLOAD_FOLDER"], filename))
+
+        cur.execute("""
+            INSERT INTO tests (test_name, subject, class, test_date, filename, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (test_name, subject, student_class, test_date, filename, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+
+        conn.commit()
+        flash("Test added successfully.", "success")
+        return redirect(url_for("admin_tests"))
+
+    cur.execute("SELECT * FROM tests ORDER BY id DESC")
+    tests = cur.fetchall()
+    conn.close()
+
+    return render_template("admin_tests.html", tests=tests)
+
+
+# ======================
 # STUDENT DASHBOARD
 # ======================
 @app.route("/student")
@@ -440,10 +584,10 @@ def student_dashboard():
         conn.close()
         return "❌ Student record not found."
 
-    cur.execute("SELECT * FROM assignments WHERE class = ?", (student["class"],))
+    cur.execute("SELECT * FROM assignments WHERE class = ? ORDER BY id DESC", (student["class"],))
     assignments = cur.fetchall()
 
-    cur.execute("SELECT * FROM tests WHERE class = ?", (student["class"],))
+    cur.execute("SELECT * FROM tests WHERE class = ? ORDER BY id DESC", (student["class"],))
     tests = cur.fetchall()
 
     conn.close()
@@ -454,6 +598,160 @@ def student_dashboard():
         assignments=assignments,
         tests=tests
     )
+
+
+# ======================
+# STUDENT ASSIGNMENTS PAGE
+# ======================
+@app.route("/student/assignments")
+def student_assignments():
+    if not student_required():
+        return redirect(url_for("login"))
+
+    username = session["user"]
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM students WHERE username = ?", (username,))
+    student = cur.fetchone()
+
+    if not student:
+        conn.close()
+        return "❌ Student record not found."
+
+    cur.execute("""
+        SELECT * FROM assignments
+        WHERE class = ?
+        ORDER BY id DESC
+    """, (student["class"],))
+    assignments = cur.fetchall()
+    conn.close()
+
+    return render_template("student_assignments.html", student=student, assignments=assignments)
+
+
+# ======================
+# STUDENT TESTS PAGE
+# ======================
+@app.route("/student/tests")
+def student_tests():
+    if not student_required():
+        return redirect(url_for("login"))
+
+    username = session["user"]
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM students WHERE username = ?", (username,))
+    student = cur.fetchone()
+
+    if not student:
+        conn.close()
+        return "❌ Student record not found."
+
+    cur.execute("""
+        SELECT * FROM tests
+        WHERE class = ?
+        ORDER BY id DESC
+    """, (student["class"],))
+    tests = cur.fetchall()
+    conn.close()
+
+    return render_template("student_tests.html", student=student, tests=tests)
+
+
+# ======================
+# VIEW FILES
+# ======================
+@app.route("/view/assignment/<filename>")
+def view_assignment(filename):
+    if not login_required():
+        return redirect(url_for("login"))
+    return send_from_directory(app.config["ASSIGNMENTS_UPLOAD_FOLDER"], filename)
+
+
+@app.route("/view/test/<filename>")
+def view_test(filename):
+    if not login_required():
+        return redirect(url_for("login"))
+    return send_from_directory(app.config["TESTS_UPLOAD_FOLDER"], filename)
+
+
+# ======================
+# DOWNLOAD FILES
+# ======================
+@app.route("/download/assignment/<filename>")
+def download_assignment(filename):
+    if not login_required():
+        return redirect(url_for("login"))
+    return send_from_directory(app.config["ASSIGNMENTS_UPLOAD_FOLDER"], filename, as_attachment=True)
+
+
+@app.route("/download/test/<filename>")
+def download_test(filename):
+    if not login_required():
+        return redirect(url_for("login"))
+    return send_from_directory(app.config["TESTS_UPLOAD_FOLDER"], filename, as_attachment=True)
+
+
+# ======================
+# DELETE ASSIGNMENT
+# ======================
+@app.route("/delete-assignment/<int:assignment_id>")
+def delete_assignment(assignment_id):
+    if not admin_required():
+        return redirect(url_for("login"))
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM assignments WHERE id = ?", (assignment_id,))
+    assignment = cur.fetchone()
+
+    if assignment:
+        filename = assignment["filename"]
+        if filename:
+            file_path = os.path.join(app.config["ASSIGNMENTS_UPLOAD_FOLDER"], filename)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+        cur.execute("DELETE FROM assignments WHERE id = ?", (assignment_id,))
+        conn.commit()
+        flash("Assignment deleted successfully.", "success")
+
+    conn.close()
+    return redirect(url_for("admin_assignments"))
+
+
+# ======================
+# DELETE TEST
+# ======================
+@app.route("/delete-test/<int:test_id>")
+def delete_test(test_id):
+    if not admin_required():
+        return redirect(url_for("login"))
+
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM tests WHERE id = ?", (test_id,))
+    test = cur.fetchone()
+
+    if test:
+        filename = test["filename"]
+        if filename:
+            file_path = os.path.join(app.config["TESTS_UPLOAD_FOLDER"], filename)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
+        cur.execute("DELETE FROM tests WHERE id = ?", (test_id,))
+        conn.commit()
+        flash("Test deleted successfully.", "success")
+
+    conn.close()
+    return redirect(url_for("admin_tests"))
 
 
 # ======================

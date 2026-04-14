@@ -47,16 +47,8 @@
             margin-bottom: 18px;
         }
 
-        .table thead th {
-            vertical-align: middle;
-        }
-
-        .badge-soft {
-            background: #e9f2ff;
-            color: #0d6efd;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 13px;
+        .btn-sm {
+            margin-right: 5px;
         }
     </style>
 </head>
@@ -66,92 +58,40 @@
 
     <!-- Header -->
     <div class="topbar mb-4">
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+        <div class="d-flex justify-content-between align-items-center">
             <div>
-                <h2 class="mb-1">🎓 Student Dashboard</h2>
-                <p class="mb-0">Welcome back, {{ student[1] }}</p>
+                <h2>🎓 Student Dashboard</h2>
+                <p>Welcome back, {{ student[1] }}</p>
             </div>
 
-            <div class="mt-3 mt-md-0">
-                <a href="/" class="btn btn-light btn-sm me-2">Home</a>
-                <a href="/contact" class="btn btn-warning btn-sm me-2">Contact</a>
+            <div>
+                <a href="/" class="btn btn-light btn-sm">Home</a>
+                <a href="/contact" class="btn btn-warning btn-sm">Contact</a>
                 <a href="/logout" class="btn btn-danger btn-sm">Logout</a>
             </div>
         </div>
     </div>
 
-    <!-- Quick Stats -->
+    <!-- Stats -->
     <div class="row mb-4">
-        <div class="col-md-4 mb-3">
+        <div class="col-md-4">
             <div class="stat-card bg-primary">
                 <h3>{{ assignments|length }}</h3>
-                <p class="mb-0">Assignments</p>
+                <p>Assignments</p>
             </div>
         </div>
 
-        <div class="col-md-4 mb-3">
+        <div class="col-md-4">
             <div class="stat-card bg-success">
                 <h3>{{ tests|length }}</h3>
-                <p class="mb-0">Tests</p>
+                <p>Tests</p>
             </div>
         </div>
 
-        <div class="col-md-4 mb-3">
+        <div class="col-md-4">
             <div class="stat-card bg-dark">
                 <h3>₹{{ student[5] }}</h3>
-                <p class="mb-0">Fee</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Profile -->
-    <div class="card-box mb-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h4 class="section-title mb-0">👤 My Profile</h4>
-            <span class="badge-soft">Class {{ student[2] }}</span>
-        </div>
-
-        <div class="row">
-            <div class="col-md-6">
-                <div class="info-box">
-                    <strong>Name:</strong> {{ student[1] }}
-                </div>
-            </div>
-
-            <div class="col-md-6">
-                <div class="info-box">
-                    <strong>Class:</strong> {{ student[2] }}
-                </div>
-            </div>
-
-            <div class="col-md-6">
-                <div class="info-box">
-                    <strong>School:</strong> {{ student[3] }}
-                </div>
-            </div>
-
-            <div class="col-md-6">
-                <div class="info-box">
-                    <strong>Joining Date:</strong> {{ student[4] }}
-                </div>
-            </div>
-
-            <div class="col-md-6">
-                <div class="info-box">
-                    <strong>Fee:</strong> ₹{{ student[5] }}
-                </div>
-            </div>
-
-            <div class="col-md-6">
-                <div class="info-box">
-                    <strong>Phone:</strong> {{ student[6] }}
-                </div>
-            </div>
-
-            <div class="col-md-6">
-                <div class="info-box">
-                    <strong>Username:</strong> {{ student[7] }}
-                </div>
+                <p>Fee</p>
             </div>
         </div>
     </div>
@@ -160,78 +100,102 @@
     <div class="card-box mb-4">
         <h4 class="section-title">📘 My Assignments</h4>
 
-        <div class="table-responsive">
-            <table class="table table-bordered table-hover align-middle">
-                <thead class="table-primary">
-                    <tr>
-                        <th>ID</th>
-                        <th>Title</th>
-                        <th>Subject</th>
-                        <th>Class</th>
-                        <th>Due Date</th>
-                    </tr>
-                </thead>
+        <table class="table table-bordered">
+            <thead class="table-primary">
+                <tr>
+                    <th>Title</th>
+                    <th>Subject</th>
+                    <th>Due Date</th>
+                    <th>File</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
 
-                <tbody>
-                    {% if assignments %}
-                        {% for a in assignments %}
-                        <tr>
-                            <td>{{ a[0] }}</td>
-                            <td>{{ a[1] }}</td>
-                            <td>{{ a[2] }}</td>
-                            <td>{{ a[3] }}</td>
-                            <td>{{ a[4] }}</td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="5" class="text-center text-muted">
-                                No assignments available for your class
-                            </td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
+            <tbody>
+                {% if assignments %}
+                    {% for a in assignments %}
+                    <tr>
+                        <td>{{ a[1] }}</td>
+                        <td>{{ a[2] }}</td>
+                        <td>{{ a[4] }}</td>
+
+                        <td>
+                            {% if a[5] %}
+                                {{ a[5] }}
+                            {% else %}
+                                No file
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if a[5] %}
+                                <a href="{{ url_for('view_assignment', filename=a[5]) }}" target="_blank" class="btn btn-info btn-sm">View</a>
+
+                                <a href="{{ url_for('download_assignment', filename=a[5]) }}" class="btn btn-success btn-sm">Download</a>
+                            {% else %}
+                                <span class="text-muted">No file</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center">No assignments available</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
     </div>
 
     <!-- Tests -->
     <div class="card-box">
         <h4 class="section-title">📝 My Tests</h4>
 
-        <div class="table-responsive">
-            <table class="table table-bordered table-hover align-middle">
-                <thead class="table-warning">
-                    <tr>
-                        <th>ID</th>
-                        <th>Test Name</th>
-                        <th>Subject</th>
-                        <th>Class</th>
-                        <th>Test Date</th>
-                    </tr>
-                </thead>
+        <table class="table table-bordered">
+            <thead class="table-warning">
+                <tr>
+                    <th>Test Name</th>
+                    <th>Subject</th>
+                    <th>Test Date</th>
+                    <th>File</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
 
-                <tbody>
-                    {% if tests %}
-                        {% for t in tests %}
-                        <tr>
-                            <td>{{ t[0] }}</td>
-                            <td>{{ t[1] }}</td>
-                            <td>{{ t[2] }}</td>
-                            <td>{{ t[3] }}</td>
-                            <td>{{ t[4] }}</td>
-                        </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="5" class="text-center text-muted">
-                                No tests available for your class
-                            </td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
+            <tbody>
+                {% if tests %}
+                    {% for t in tests %}
+                    <tr>
+                        <td>{{ t[1] }}</td>
+                        <td>{{ t[2] }}</td>
+                        <td>{{ t[4] }}</td>
+
+                        <td>
+                            {% if t[5] %}
+                                {{ t[5] }}
+                            {% else %}
+                                No file
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if t[5] %}
+                                <a href="{{ url_for('view_test', filename=t[5]) }}" target="_blank" class="btn btn-info btn-sm">View</a>
+
+                                <a href="{{ url_for('download_test', filename=t[5]) }}" class="btn btn-success btn-sm">Download</a>
+                            {% else %}
+                                <span class="text-muted">No file</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center">No tests available</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
     </div>
 
 </div>
