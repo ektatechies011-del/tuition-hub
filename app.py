@@ -8,7 +8,6 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import cloudinary
 import cloudinary.uploader
-import cloudinary.utils
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
@@ -189,7 +188,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS students (
             id BIGSERIAL PRIMARY KEY,
             name TEXT,
-            class TEXT,
+            "class" TEXT,
             school TEXT,
             joining_date TEXT,
             fee INTEGER,
@@ -212,7 +211,7 @@ def init_db():
             id BIGSERIAL PRIMARY KEY,
             title TEXT,
             subject TEXT,
-            class TEXT,
+            "class" TEXT,
             due_date TEXT,
             file_url TEXT,
             created_at TEXT
@@ -224,7 +223,7 @@ def init_db():
             id BIGSERIAL PRIMARY KEY,
             test_name TEXT,
             subject TEXT,
-            class TEXT,
+            "class" TEXT,
             test_date TEXT,
             file_url TEXT,
             created_at TEXT
@@ -463,7 +462,7 @@ def submit():
 
         cur2 = conn.cursor()
         cur2.execute("""
-            INSERT INTO students (name, class, school, joining_date, fee, phone, username)
+            INSERT INTO students (name, "class", school, joining_date, fee, phone, username)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, (name, student_class, school, joining_date, fee, phone, username))
 
@@ -496,7 +495,7 @@ def fix_student_users():
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute("SELECT username FROM students WHERE username IS NOT NULL AND username != ''")
+    cur.execute('SELECT username FROM students WHERE username IS NOT NULL AND username != ""')
     student_usernames = fetch_all_dicts(cur)
 
     added = 0
@@ -562,7 +561,7 @@ def admin():
         cur.execute("""
             SELECT * FROM students
             WHERE name ILIKE %s
-               OR class ILIKE %s
+               OR "class" ILIKE %s
                OR school ILIKE %s
                OR phone ILIKE %s
                OR username ILIKE %s
@@ -643,7 +642,7 @@ def admin_assignments():
         cur2 = conn.cursor()
         cur2.execute("""
             INSERT INTO assignments (
-                title, subject, class, due_date, file_url, created_at,
+                title, subject, "class", due_date, file_url, created_at,
                 original_filename, public_id, resource_type
             )
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -668,7 +667,7 @@ def admin_assignments():
 
     cur.execute("""
         SELECT
-            id, title, subject, class, due_date,
+            id, title, subject, "class" AS class, due_date,
             COALESCE(original_filename, '') AS filename,
             created_at
         FROM assignments
@@ -724,7 +723,7 @@ def admin_tests():
         cur2 = conn.cursor()
         cur2.execute("""
             INSERT INTO tests (
-                test_name, subject, class, test_date, file_url, created_at,
+                test_name, subject, "class", test_date, file_url, created_at,
                 original_filename, public_id, resource_type
             )
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
@@ -749,7 +748,7 @@ def admin_tests():
 
     cur.execute("""
         SELECT
-            id, test_name, subject, class, test_date,
+            id, test_name, subject, "class" AS class, test_date,
             COALESCE(original_filename, '') AS filename,
             created_at
         FROM tests
@@ -785,20 +784,20 @@ def student_dashboard():
 
     cur.execute("""
         SELECT
-            id, title, subject, class, due_date,
+            id, title, subject, "class" AS class, due_date,
             COALESCE(original_filename, '') AS filename
         FROM assignments
-        WHERE class = %s
+        WHERE "class" = %s
         ORDER BY id DESC
     """, (student_dict["class"],))
     assignments_dict = fetch_all_dicts(cur)
 
     cur.execute("""
         SELECT
-            id, test_name, subject, class, test_date,
+            id, test_name, subject, "class" AS class, test_date,
             COALESCE(original_filename, '') AS filename
         FROM tests
-        WHERE class = %s
+        WHERE "class" = %s
         ORDER BY id DESC
     """, (student_dict["class"],))
     tests_dict = fetch_all_dicts(cur)
@@ -837,10 +836,10 @@ def student_assignments():
 
     cur.execute("""
         SELECT
-            id, title, subject, class, due_date,
+            id, title, subject, "class" AS class, due_date,
             COALESCE(original_filename, '') AS filename
         FROM assignments
-        WHERE class = %s
+        WHERE "class" = %s
         ORDER BY id DESC
     """, (student["class"],))
     assignments = fetch_all_dicts(cur)
@@ -874,10 +873,10 @@ def student_tests():
 
     cur.execute("""
         SELECT
-            id, test_name, subject, class, test_date,
+            id, test_name, subject, "class" AS class, test_date,
             COALESCE(original_filename, '') AS filename
         FROM tests
-        WHERE class = %s
+        WHERE "class" = %s
         ORDER BY id DESC
     """, (student["class"],))
     tests = fetch_all_dicts(cur)
