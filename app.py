@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 import os
+import urllib.parse
 from datetime import datetime
 
 import psycopg2
@@ -162,11 +163,13 @@ def get_cloudinary_download_url(public_id, resource_type, original_filename="fil
     if not public_id:
         return ""
 
+    safe_filename = urllib.parse.quote(original_filename)
+
     download_url, _ = cloudinary.utils.cloudinary_url(
         public_id,
         resource_type=resource_type or "raw",
         type="upload",
-        flags=f"attachment:{original_filename}"
+        flags=f"attachment:{safe_filename}"
     )
     return download_url
 
