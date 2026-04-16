@@ -889,40 +889,36 @@ def student_tests():
 # ======================
 @app.route("/view/assignment/<int:assignment_id>")
 def view_assignment(assignment_id):
-    if not login_required():
-        return redirect(url_for("login"))
-
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("SELECT file_url FROM assignments WHERE id = %s", (assignment_id,))
+
+    cur.execute("SELECT * FROM assignments WHERE id = %s", (assignment_id,))
     assignment = fetch_one_dict(cur)
+
     cur.close()
     conn.close()
 
-    if not assignment or not assignment.get("file_url"):
-        flash("File not found.", "danger")
-        return redirect(url_for("admin_assignments") if session.get("role") == "admin" else url_for("student_dashboard"))
+    if assignment and assignment["file_url"]:
+        return redirect(assignment["file_url"])
 
-    return redirect(assignment["file_url"])
+    return "File not found"
 
 
 @app.route("/view/test/<int:test_id>")
 def view_test(test_id):
-    if not login_required():
-        return redirect(url_for("login"))
-
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
+
     cur.execute("SELECT file_url FROM tests WHERE id = %s", (test_id,))
     test = fetch_one_dict(cur)
+
     cur.close()
     conn.close()
 
-    if not test or not test.get("file_url"):
-        flash("File not found.", "danger")
-        return redirect(url_for("admin_tests") if session.get("role") == "admin" else url_for("student_dashboard"))
+    if test and test["file_url"]:
+        return redirect(test["file_url"])
 
-    return redirect(test["file_url"])
+    return "File not found"
 
 
 # ======================
@@ -930,48 +926,36 @@ def view_test(test_id):
 # ======================
 @app.route("/download/assignment/<int:assignment_id>")
 def download_assignment(assignment_id):
-    if not login_required():
-        return redirect(url_for("login"))
-
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("""
-        SELECT file_url, COALESCE(original_filename, 'assignment_file') AS original_filename
-        FROM assignments
-        WHERE id = %s
-    """, (assignment_id,))
+
+    cur.execute("SELECT * FROM assignments WHERE id = %s", (assignment_id,))
     assignment = fetch_one_dict(cur)
+
     cur.close()
     conn.close()
 
-    if not assignment or not assignment.get("file_url"):
-        flash("File not found.", "danger")
-        return redirect(url_for("admin_assignments") if session.get("role") == "admin" else url_for("student_dashboard"))
+    if assignment and assignment["file_url"]:
+        return redirect(assignment["file_url"])
 
-    return redirect(assignment["file_url"])
+    return "File not found"
 
 
 @app.route("/download/test/<int:test_id>")
 def download_test(test_id):
-    if not login_required():
-        return redirect(url_for("login"))
-
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    cur.execute("""
-        SELECT file_url, COALESCE(original_filename, 'test_file') AS original_filename
-        FROM tests
-        WHERE id = %s
-    """, (test_id,))
+
+    cur.execute("SELECT file_url FROM tests WHERE id = %s", (test_id,))
     test = fetch_one_dict(cur)
+
     cur.close()
     conn.close()
 
-    if not test or not test.get("file_url"):
-        flash("File not found.", "danger")
-        return redirect(url_for("admin_tests") if session.get("role") == "admin" else url_for("student_dashboard"))
+    if test and test["file_url"]:
+        return redirect(test["file_url"])
 
-    return redirect(test["file_url"])
+    return "File not found"
 
 
 # ======================
@@ -1073,7 +1057,7 @@ def logout():
 
 
 # ======================
-# RUN 
+# RUN
 # ======================
 if __name__ == "__main__":
     ensure_database_ready()
