@@ -34,14 +34,6 @@
             box-shadow: 0px 4px 12px rgba(0,0,0,0.12);
         }
 
-        .info-box {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 14px;
-            margin-bottom: 12px;
-            border: 1px solid #e9ecef;
-        }
-
         .section-title {
             font-weight: 700;
             margin-bottom: 18px;
@@ -52,6 +44,7 @@
         }
     </style>
 </head>
+
 <body>
 
 <div class="container py-4">
@@ -129,9 +122,17 @@
 
                         <td>
                             {% if a[5] %}
-                                <a href="{{ url_for('view_assignment', filename=a[5]) }}" target="_blank" class="btn btn-info btn-sm">View</a>
+                                <!-- ✅ FIXED VIEW -->
+                                <a href="{{ url_for('view_assignment', assignment_id=a[0]) }}" 
+                                   target="_blank" class="btn btn-info btn-sm">
+                                   View
+                                </a>
 
-                                <a href="{{ url_for('download_assignment', filename=a[5]) }}" class="btn btn-success btn-sm">Download</a>
+                                <!-- ✅ DOWNLOAD -->
+                                <a href="{{ url_for('download_assignment', assignment_id=a[0]) }}" 
+                                   class="btn btn-success btn-sm">
+                                   Download
+                                </a>
                             {% else %}
                                 <span class="text-muted">No file</span>
                             {% endif %}
@@ -180,9 +181,17 @@
 
                         <td>
                             {% if t[5] %}
-                                <a href="{{ url_for('view_test', filename=t[5]) }}" target="_blank" class="btn btn-info btn-sm">View</a>
+                                <!-- ✅ FIXED VIEW -->
+                                <a href="{{ url_for('view_test', test_id=t[0]) }}" 
+                                   target="_blank" class="btn btn-info btn-sm">
+                                   View
+                                </a>
 
-                                <a href="{{ url_for('download_test', filename=t[5]) }}" class="btn btn-success btn-sm">Download</a>
+                                <!-- ✅ DOWNLOAD -->
+                                <a href="{{ url_for('download_test', test_id=t[0]) }}" 
+                                   class="btn btn-success btn-sm">
+                                   Download
+                                </a>
                             {% else %}
                                 <span class="text-muted">No file</span>
                             {% endif %}
