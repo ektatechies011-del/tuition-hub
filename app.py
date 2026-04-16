@@ -1,13 +1,12 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 import os
-import urllib.request
-from io import BytesIO
 from datetime import datetime
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import cloudinary
 import cloudinary.uploader
+import cloudinary.utils
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
@@ -30,9 +29,7 @@ if DATABASE_URL and "sslmode=" not in DATABASE_URL:
     else:
         DATABASE_URL += "?sslmode=require"
 
-cloudinary.config(
-    secure=True
-)
+cloudinary.config(secure=True)
 
 
 # ======================
@@ -161,17 +158,17 @@ def destroy_from_cloudinary(public_id, resource_type):
         )
 
 
-def stream_download(file_url, download_name):
-    with urllib.request.urlopen(file_url) as response:
-        data = response.read()
-        content_type = response.headers.get("Content-Type", "application/octet-stream")
+def get_cloudinary_download_url(public_id, resource_type, original_filename="file"):
+    if not public_id:
+        return ""
 
-    return send_file(
-        BytesIO(data),
-        mimetype=content_type,
-        as_attachment=True,
-        download_name=download_name or "file"
+    download_url, _ = cloudinary.utils.cloudinary_url(
+        public_id,
+        resource_type=resource_type or "raw",
+        type="upload",
+        flags=f"attachment:{original_filename}"
     )
+    return download_url
 
 
 # ======================
@@ -939,7 +936,7 @@ def download_assignment(assignment_id):
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     cur.execute("""
-        SELECT file_url, original_filename
+        SELECT file_url, original_filename, public_id, resource_type
         FROM assignments
         WHERE id = %s
     """, (assignment_id,))
@@ -950,7 +947,16 @@ def download_assignment(assignment_id):
 
     if assignment and assignment.get("file_url"):
         filename = assignment.get("original_filename") or f"assignment_{assignment_id}"
-        return stream_download(assignment["file_url"], filename)
+
+        if assignment.get("public_id"):
+            download_url = get_cloudinary_download_url(
+                assignment["public_id"],
+                assignment.get("resource_type"),
+                filename
+            )
+            return redirect(download_url)
+
+        return redirect(assignment["file_url"])
 
     return "File not found"
 
@@ -964,7 +970,7 @@ def download_test(test_id):
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     cur.execute("""
-        SELECT file_url, original_filename
+        SELECT file_url, original_filename, public_id, resource_type
         FROM tests
         WHERE id = %s
     """, (test_id,))
@@ -975,7 +981,16 @@ def download_test(test_id):
 
     if test and test.get("file_url"):
         filename = test.get("original_filename") or f"test_{test_id}"
-        return stream_download(test["file_url"], filename)
+
+        if test.get("public_id"):
+            download_url = get_cloudinary_download_url(
+                test["public_id"],
+                test.get("resource_type"),
+                filename
+            )
+            return redirect(download_url)
+
+        return redirect(test["file_url"])
 
     return "File not found"
 
