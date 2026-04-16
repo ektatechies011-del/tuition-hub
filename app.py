@@ -948,7 +948,7 @@ def download_assignment(assignment_id):
         flash("File not found.", "danger")
         return redirect(url_for("admin_assignments") if session.get("role") == "admin" else url_for("student_dashboard"))
 
-    return stream_download(assignment["file_url"], assignment["original_filename"])
+    return redirect(assignment["file_url"])
 
 
 @app.route("/download/test/<int:test_id>")
@@ -971,7 +971,7 @@ def download_test(test_id):
         flash("File not found.", "danger")
         return redirect(url_for("admin_tests") if session.get("role") == "admin" else url_for("student_dashboard"))
 
-    return stream_download(test["file_url"], test["original_filename"])
+    return redirect(test["file_url"])
 
 
 # ======================
@@ -1073,7 +1073,7 @@ def logout():
 
 
 # ======================
-# RUN
+# RUN 
 # ======================
 if __name__ == "__main__":
     ensure_database_ready()

@@ -41,6 +41,16 @@
 
         .btn-sm {
             margin-right: 5px;
+            margin-bottom: 4px;
+        }
+
+        .file-link {
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .file-link:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -49,12 +59,11 @@
 
 <div class="container py-4">
 
-    <!-- Header -->
     <div class="topbar mb-4">
-        <div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div>
                 <h2>🎓 Student Dashboard</h2>
-                <p>Welcome back, {{ student[1] }}</p>
+                <p class="mb-0">Welcome back, {{ student[1] }}</p>
             </div>
 
             <div>
@@ -65,146 +74,147 @@
         </div>
     </div>
 
-    <!-- Stats -->
     <div class="row mb-4">
-        <div class="col-md-4">
+        <div class="col-md-4 mb-3">
             <div class="stat-card bg-primary">
                 <h3>{{ assignments|length }}</h3>
-                <p>Assignments</p>
+                <p class="mb-0">Assignments</p>
             </div>
         </div>
 
-        <div class="col-md-4">
+        <div class="col-md-4 mb-3">
             <div class="stat-card bg-success">
                 <h3>{{ tests|length }}</h3>
-                <p>Tests</p>
+                <p class="mb-0">Tests</p>
             </div>
         </div>
 
-        <div class="col-md-4">
+        <div class="col-md-4 mb-3">
             <div class="stat-card bg-dark">
                 <h3>₹{{ student[5] }}</h3>
-                <p>Fee</p>
+                <p class="mb-0">Fee</p>
             </div>
         </div>
     </div>
 
-    <!-- Assignments -->
     <div class="card-box mb-4">
         <h4 class="section-title">📘 My Assignments</h4>
 
-        <table class="table table-bordered">
-            <thead class="table-primary">
-                <tr>
-                    <th>Title</th>
-                    <th>Subject</th>
-                    <th>Due Date</th>
-                    <th>File</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-
-            <tbody>
-                {% if assignments %}
-                    {% for a in assignments %}
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+                <thead class="table-primary">
                     <tr>
-                        <td>{{ a[1] }}</td>
-                        <td>{{ a[2] }}</td>
-                        <td>{{ a[4] }}</td>
-
-                        <td>
-                            {% if a[5] %}
-                                {{ a[5] }}
-                            {% else %}
-                                No file
-                            {% endif %}
-                        </td>
-
-                        <td>
-                            {% if a[5] %}
-                                <!-- ✅ FIXED VIEW -->
-                                <a href="{{ url_for('view_assignment', assignment_id=a[0]) }}" 
-                                   target="_blank" class="btn btn-info btn-sm">
-                                   View
-                                </a>
-
-                                <!-- ✅ DOWNLOAD -->
-                                <a href="{{ url_for('download_assignment', assignment_id=a[0]) }}" 
-                                   class="btn btn-success btn-sm">
-                                   Download
-                                </a>
-                            {% else %}
-                                <span class="text-muted">No file</span>
-                            {% endif %}
-                        </td>
+                        <th>Title</th>
+                        <th>Subject</th>
+                        <th>Due Date</th>
+                        <th>File</th>
+                        <th>Action</th>
                     </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="5" class="text-center">No assignments available</td>
-                    </tr>
-                {% endif %}
-            </tbody>
-        </table>
+                </thead>
+
+                <tbody>
+                    {% if assignments %}
+                        {% for a in assignments %}
+                        <tr>
+                            <td>{{ a[1] }}</td>
+                            <td>{{ a[2] }}</td>
+                            <td>{{ a[4] }}</td>
+
+                            <td>
+                                {% if a[5] %}
+                                    <a href="{{ url_for('view_assignment', assignment_id=a[0]) }}" target="_blank" class="file-link">
+                                        {{ a[5] }}
+                                    </a>
+                                {% else %}
+                                    No file
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if a[5] %}
+                                    <a href="{{ url_for('view_assignment', assignment_id=a[0]) }}"
+                                       target="_blank" class="btn btn-info btn-sm">
+                                       View
+                                    </a>
+
+                                    <a href="{{ url_for('download_assignment', assignment_id=a[0]) }}"
+                                       class="btn btn-success btn-sm">
+                                       Download
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">No file</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center">No assignments available</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <!-- Tests -->
     <div class="card-box">
         <h4 class="section-title">📝 My Tests</h4>
 
-        <table class="table table-bordered">
-            <thead class="table-warning">
-                <tr>
-                    <th>Test Name</th>
-                    <th>Subject</th>
-                    <th>Test Date</th>
-                    <th>File</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-
-            <tbody>
-                {% if tests %}
-                    {% for t in tests %}
+        <div class="table-responsive">
+            <table class="table table-bordered align-middle">
+                <thead class="table-warning">
                     <tr>
-                        <td>{{ t[1] }}</td>
-                        <td>{{ t[2] }}</td>
-                        <td>{{ t[4] }}</td>
-
-                        <td>
-                            {% if t[5] %}
-                                {{ t[5] }}
-                            {% else %}
-                                No file
-                            {% endif %}
-                        </td>
-
-                        <td>
-                            {% if t[5] %}
-                                <!-- ✅ FIXED VIEW -->
-                                <a href="{{ url_for('view_test', test_id=t[0]) }}" 
-                                   target="_blank" class="btn btn-info btn-sm">
-                                   View
-                                </a>
-
-                                <!-- ✅ DOWNLOAD -->
-                                <a href="{{ url_for('download_test', test_id=t[0]) }}" 
-                                   class="btn btn-success btn-sm">
-                                   Download
-                                </a>
-                            {% else %}
-                                <span class="text-muted">No file</span>
-                            {% endif %}
-                        </td>
+                        <th>Test Name</th>
+                        <th>Subject</th>
+                        <th>Test Date</th>
+                        <th>File</th>
+                        <th>Action</th>
                     </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="5" class="text-center">No tests available</td>
-                    </tr>
-                {% endif %}
-            </tbody>
-        </table>
+                </thead>
+
+                <tbody>
+                    {% if tests %}
+                        {% for t in tests %}
+                        <tr>
+                            <td>{{ t[1] }}</td>
+                            <td>{{ t[2] }}</td>
+                            <td>{{ t[4] }}</td>
+
+                            <td>
+                                {% if t[5] %}
+                                    <a href="{{ url_for('view_test', test_id=t[0]) }}" target="_blank" class="file-link">
+                                        {{ t[5] }}
+                                    </a>
+                                {% else %}
+                                    No file
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {% if t[5] %}
+                                    <a href="{{ url_for('view_test', test_id=t[0]) }}"
+                                       target="_blank" class="btn btn-info btn-sm">
+                                       View
+                                    </a>
+
+                                    <a href="{{ url_for('download_test', test_id=t[0]) }}"
+                                       class="btn btn-success btn-sm">
+                                       Download
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">No file</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center">No tests available</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
     </div>
 
 </div>
