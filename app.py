@@ -1,11 +1,13 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 import os
 from datetime import datetime
+import urllib.parse
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import cloudinary
 import cloudinary.uploader
+import cloudinary.utils
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
@@ -182,6 +184,21 @@ def destroy_from_cloudinary(public_id, resource_type):
             resource_type=resource_type or "raw",
             invalidate=True
         )
+
+
+def get_download_url(public_id, resource_type, original_filename):
+    if not public_id:
+        return ""
+
+    safe_filename = urllib.parse.quote(original_filename or "file")
+
+    download_url, _ = cloudinary.utils.cloudinary_url(
+        public_id,
+        resource_type=resource_type or "raw",
+        type="upload",
+        flags=f"attachment:{safe_filename}"
+    )
+    return download_url
 
 
 # ======================
@@ -980,7 +997,7 @@ def download_assignment(assignment_id):
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
         cur.execute("""
-            SELECT file_url
+            SELECT file_url, public_id, resource_type, original_filename
             FROM assignments
             WHERE id = %s
         """, (assignment_id,))
@@ -992,10 +1009,19 @@ def download_assignment(assignment_id):
         if not assignment:
             return "❌ Assignment not found"
 
-        if not assignment.get("file_url"):
-            return "❌ File URL missing for this assignment"
+        if assignment.get("public_id"):
+            download_url = get_download_url(
+                assignment.get("public_id"),
+                assignment.get("resource_type"),
+                assignment.get("original_filename")
+            )
+            if download_url:
+                return redirect(download_url, code=302)
 
-        return redirect(assignment["file_url"], code=302)
+        if assignment.get("file_url"):
+            return redirect(assignment["file_url"], code=302)
+
+        return "❌ File URL missing for this assignment"
 
     except Exception as e:
         return f"❌ Download error: {str(e)}"
@@ -1011,7 +1037,7 @@ def download_test(test_id):
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
         cur.execute("""
-            SELECT file_url
+            SELECT file_url, public_id, resource_type, original_filename
             FROM tests
             WHERE id = %s
         """, (test_id,))
@@ -1023,10 +1049,19 @@ def download_test(test_id):
         if not test:
             return "❌ Test not found"
 
-        if not test.get("file_url"):
-            return "❌ File URL missing for this test"
+        if test.get("public_id"):
+            download_url = get_download_url(
+                test.get("public_id"),
+                test.get("resource_type"),
+                test.get("original_filename")
+            )
+            if download_url:
+                return redirect(download_url, code=302)
 
-        return redirect(test["file_url"], code=302)
+        if test.get("file_url"):
+            return redirect(test["file_url"], code=302)
+
+        return "❌ File URL missing for this test"
 
     except Exception as e:
         return f"❌ Download error: {str(e)}"
