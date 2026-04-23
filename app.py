@@ -30,7 +30,13 @@ if DATABASE_URL and "sslmode=" not in DATABASE_URL:
     else:
         DATABASE_URL += "?sslmode=require"
 
-cloudinary.config(secure=True)
+# Cloudinary config
+cloudinary.config(
+    cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.environ.get("CLOUDINARY_API_KEY"),
+    api_secret=os.environ.get("CLOUDINARY_API_SECRET"),
+    secure=True
+)
 
 
 # ======================
@@ -634,7 +640,13 @@ def admin_assignments():
                 conn.close()
                 return redirect(url_for("admin_assignments"))
 
-            uploaded = upload_to_cloudinary(file, "tuition_hub/assignments")
+            try:
+                uploaded = upload_to_cloudinary(file, "tuition_hub/assignments")
+            except Exception as e:
+                flash(f"File upload failed: {str(e)}", "danger")
+                cur.close()
+                conn.close()
+                return redirect(url_for("admin_assignments"))
 
         cur2 = conn.cursor()
         cur2.execute("""
@@ -666,6 +678,7 @@ def admin_assignments():
         SELECT
             id, title, subject, "class" AS class, due_date,
             COALESCE(original_filename, '') AS filename,
+            file_url,
             created_at
         FROM assignments
         ORDER BY id DESC
@@ -715,7 +728,13 @@ def admin_tests():
                 conn.close()
                 return redirect(url_for("admin_tests"))
 
-            uploaded = upload_to_cloudinary(file, "tuition_hub/tests")
+            try:
+                uploaded = upload_to_cloudinary(file, "tuition_hub/tests")
+            except Exception as e:
+                flash(f"File upload failed: {str(e)}", "danger")
+                cur.close()
+                conn.close()
+                return redirect(url_for("admin_tests"))
 
         cur2 = conn.cursor()
         cur2.execute("""
@@ -747,6 +766,7 @@ def admin_tests():
         SELECT
             id, test_name, subject, "class" AS class, test_date,
             COALESCE(original_filename, '') AS filename,
+            file_url,
             created_at
         FROM tests
         ORDER BY id DESC
@@ -895,16 +915,23 @@ def view_assignment(assignment_id):
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute("SELECT file_url FROM assignments WHERE id = %s", (assignment_id,))
+    cur.execute("""
+        SELECT id, title, file_url, original_filename
+        FROM assignments
+        WHERE id = %s
+    """, (assignment_id,))
     assignment = fetch_one_dict(cur)
 
     cur.close()
     conn.close()
 
-    if assignment and assignment.get("file_url"):
-        return redirect(assignment["file_url"])
+    if not assignment:
+        return "❌ Assignment not found"
 
-    return "File not found"
+    if not assignment.get("file_url"):
+        return "❌ File URL missing for this assignment"
+
+    return redirect(assignment["file_url"], code=302)
 
 
 @app.route("/view/test/<int:test_id>")
@@ -915,16 +942,23 @@ def view_test(test_id):
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute("SELECT file_url FROM tests WHERE id = %s", (test_id,))
+    cur.execute("""
+        SELECT id, test_name, file_url, original_filename
+        FROM tests
+        WHERE id = %s
+    """, (test_id,))
     test = fetch_one_dict(cur)
 
     cur.close()
     conn.close()
 
-    if test and test.get("file_url"):
-        return redirect(test["file_url"])
+    if not test:
+        return "❌ Test not found"
 
-    return "File not found"
+    if not test.get("file_url"):
+        return "❌ File URL missing for this test"
+
+    return redirect(test["file_url"], code=302)
 
 
 # ======================
@@ -948,20 +982,24 @@ def download_assignment(assignment_id):
     cur.close()
     conn.close()
 
-    if assignment and assignment.get("file_url"):
-        filename = assignment.get("original_filename") or f"assignment_{assignment_id}"
+    if not assignment:
+        return "❌ Assignment not found"
 
-        if assignment.get("public_id"):
-            download_url = get_cloudinary_download_url(
-                assignment["public_id"],
-                assignment.get("resource_type"),
-                filename
-            )
-            return redirect(download_url)
+    if not assignment.get("file_url"):
+        return "❌ File URL missing for this assignment"
 
-        return redirect(assignment["file_url"])
+    filename = assignment.get("original_filename") or f"assignment_{assignment_id}"
 
-    return "File not found"
+    if assignment.get("public_id"):
+        download_url = get_cloudinary_download_url(
+            assignment["public_id"],
+            assignment.get("resource_type"),
+            filename
+        )
+        if download_url:
+            return redirect(download_url, code=302)
+
+    return redirect(assignment["file_url"], code=302)
 
 
 @app.route("/download/test/<int:test_id>")
@@ -982,20 +1020,24 @@ def download_test(test_id):
     cur.close()
     conn.close()
 
-    if test and test.get("file_url"):
-        filename = test.get("original_filename") or f"test_{test_id}"
+    if not test:
+        return "❌ Test not found"
 
-        if test.get("public_id"):
-            download_url = get_cloudinary_download_url(
-                test["public_id"],
-                test.get("resource_type"),
-                filename
-            )
-            return redirect(download_url)
+    if not test.get("file_url"):
+        return "❌ File URL missing for this test"
 
-        return redirect(test["file_url"])
+    filename = test.get("original_filename") or f"test_{test_id}"
 
-    return "File not found"
+    if test.get("public_id"):
+        download_url = get_cloudinary_download_url(
+            test["public_id"],
+            test.get("resource_type"),
+            filename
+        )
+        if download_url:
+            return redirect(download_url, code=302)
+
+    return redirect(test["file_url"], code=302)
 
 
 # ======================
