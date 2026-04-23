@@ -31,7 +31,6 @@ if DATABASE_URL and "sslmode=" not in DATABASE_URL:
     else:
         DATABASE_URL += "?sslmode=require"
 
-# Cloudinary config
 cloudinary.config(
     cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
     api_key=os.environ.get("CLOUDINARY_API_KEY"),
@@ -939,7 +938,7 @@ def view_assignment(assignment_id):
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     cur.execute("""
-        SELECT id, title, file_url, original_filename
+        SELECT id, title, file_url, original_filename, public_id, resource_type
         FROM assignments
         WHERE id = %s
     """, (assignment_id,))
@@ -951,10 +950,18 @@ def view_assignment(assignment_id):
     if not assignment:
         return "❌ Assignment not found"
 
-    if not assignment.get("file_url"):
-        return "❌ File URL missing for this assignment"
+    if assignment.get("public_id"):
+        view_url, _ = cloudinary.utils.cloudinary_url(
+            assignment.get("public_id"),
+            resource_type=assignment.get("resource_type") or "raw",
+            type="upload"
+        )
+        return redirect(view_url, code=302)
 
-    return redirect(assignment["file_url"], code=302)
+    if assignment.get("file_url"):
+        return redirect(assignment["file_url"], code=302)
+
+    return "❌ File URL missing for this assignment"
 
 
 @app.route("/view/test/<int:test_id>")
@@ -966,7 +973,7 @@ def view_test(test_id):
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     cur.execute("""
-        SELECT id, test_name, file_url, original_filename
+        SELECT id, test_name, file_url, original_filename, public_id, resource_type
         FROM tests
         WHERE id = %s
     """, (test_id,))
@@ -978,10 +985,18 @@ def view_test(test_id):
     if not test:
         return "❌ Test not found"
 
-    if not test.get("file_url"):
-        return "❌ File URL missing for this test"
+    if test.get("public_id"):
+        view_url, _ = cloudinary.utils.cloudinary_url(
+            test.get("public_id"),
+            resource_type=test.get("resource_type") or "raw",
+            type="upload"
+        )
+        return redirect(view_url, code=302)
 
-    return redirect(test["file_url"], code=302)
+    if test.get("file_url"):
+        return redirect(test["file_url"], code=302)
+
+    return "❌ File URL missing for this test"
 
 
 # ======================
@@ -1189,11 +1204,3 @@ def student_assistant():
 def logout():
     session.clear()
     return redirect(url_for("login"))
-
-
-# ======================
-# RUN
-# ======================
-if __name__ == "__main__":
-    ensure_database_ready()
-    app.run(debug=True)
