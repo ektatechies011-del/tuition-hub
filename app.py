@@ -18,7 +18,8 @@ app = Flask(
     template_folder=TEMPLATES_DIR,
     static_folder=STATIC_DIR
 )
-app.secret_key = "tuition_secret_key"
+
+app.secret_key = os.environ.get("SECRET_KEY", "tuition_secret_key")
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 
@@ -51,6 +52,24 @@ def get_connection():
 # ======================
 def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def get_file_extension(filename):
+    if not filename or "." not in filename:
+        return ""
+    return filename.rsplit(".", 1)[1].lower()
+
+
+def get_cloudinary_resource_type(filename):
+    ext = get_file_extension(filename)
+
+    if ext in {"png", "jpg", "jpeg"}:
+        return "image"
+
+    if ext in {"pdf", "doc", "docx"}:
+        return "raw"
+
+    return "raw"
 
 
 def fetch_one_dict(cur):
@@ -137,9 +156,11 @@ def tests_to_tuples(tests):
 
 
 def upload_to_cloudinary(file, folder_name):
+    resource_type = get_cloudinary_resource_type(file.filename)
+
     upload_result = cloudinary.uploader.upload(
         file,
-        resource_type="auto",
+        resource_type=resource_type,
         folder=folder_name,
         use_filename=True,
         unique_filename=True,
@@ -149,7 +170,7 @@ def upload_to_cloudinary(file, folder_name):
     return {
         "file_url": upload_result.get("secure_url", ""),
         "public_id": upload_result.get("public_id", ""),
-        "resource_type": upload_result.get("resource_type", "raw"),
+        "resource_type": upload_result.get("resource_type", resource_type),
         "original_filename": file.filename
     }
 
@@ -1019,28 +1040,41 @@ def delete_assignment(assignment_id):
     if not admin_required():
         return redirect(url_for("login"))
 
-    conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute("""
-        SELECT public_id, resource_type
-        FROM assignments
-        WHERE id = %s
-    """, (assignment_id,))
-    assignment = fetch_one_dict(cur)
+        cur.execute("""
+            SELECT public_id, resource_type
+            FROM assignments
+            WHERE id = %s
+        """, (assignment_id,))
+        assignment = fetch_one_dict(cur)
 
-    if assignment:
-        destroy_from_cloudinary(assignment.get("public_id"), assignment.get("resource_type"))
+        if assignment:
+            try:
+                if assignment.get("public_id"):
+                    destroy_from_cloudinary(
+                        assignment.get("public_id"),
+                        assignment.get("resource_type")
+                    )
+            except Exception as cloud_err:
+                print("Cloudinary delete error:", str(cloud_err))
 
-        cur2 = conn.cursor()
-        cur2.execute("DELETE FROM assignments WHERE id = %s", (assignment_id,))
-        conn.commit()
-        cur2.close()
-        flash("Assignment deleted successfully.", "success")
+            cur2 = conn.cursor()
+            cur2.execute("DELETE FROM assignments WHERE id = %s", (assignment_id,))
+            conn.commit()
+            cur2.close()
+            flash("Assignment deleted successfully.", "success")
+        else:
+            flash("Assignment not found.", "danger")
 
-    cur.close()
-    conn.close()
-    return redirect(url_for("admin_assignments"))
+        cur.close()
+        conn.close()
+        return redirect(url_for("admin_assignments"))
+
+    except Exception as e:
+        return f"❌ Delete assignment error: {str(e)}"
 
 
 # ======================
@@ -1051,28 +1085,41 @@ def delete_test(test_id):
     if not admin_required():
         return redirect(url_for("login"))
 
-    conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute("""
-        SELECT public_id, resource_type
-        FROM tests
-        WHERE id = %s
-    """, (test_id,))
-    test = fetch_one_dict(cur)
+        cur.execute("""
+            SELECT public_id, resource_type
+            FROM tests
+            WHERE id = %s
+        """, (test_id,))
+        test = fetch_one_dict(cur)
 
-    if test:
-        destroy_from_cloudinary(test.get("public_id"), test.get("resource_type"))
+        if test:
+            try:
+                if test.get("public_id"):
+                    destroy_from_cloudinary(
+                        test.get("public_id"),
+                        test.get("resource_type")
+                    )
+            except Exception as cloud_err:
+                print("Cloudinary delete error:", str(cloud_err))
 
-        cur2 = conn.cursor()
-        cur2.execute("DELETE FROM tests WHERE id = %s", (test_id,))
-        conn.commit()
-        cur2.close()
-        flash("Test deleted successfully.", "success")
+            cur2 = conn.cursor()
+            cur2.execute("DELETE FROM tests WHERE id = %s", (test_id,))
+            conn.commit()
+            cur2.close()
+            flash("Test deleted successfully.", "success")
+        else:
+            flash("Test not found.", "danger")
 
-    cur.close()
-    conn.close()
-    return redirect(url_for("admin_tests"))
+        cur.close()
+        conn.close()
+        return redirect(url_for("admin_tests"))
+
+    except Exception as e:
+        return f"❌ Delete test error: {str(e)}"
 
 
 # ======================
