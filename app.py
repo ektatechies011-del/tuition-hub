@@ -1,13 +1,11 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 import os
-import urllib.parse
 from datetime import datetime
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
 import cloudinary
 import cloudinary.uploader
-import cloudinary.utils
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
@@ -163,21 +161,6 @@ def destroy_from_cloudinary(public_id, resource_type):
             resource_type=resource_type or "raw",
             invalidate=True
         )
-
-
-def get_cloudinary_download_url(public_id, resource_type, original_filename="file"):
-    if not public_id:
-        return ""
-
-    safe_filename = urllib.parse.quote(original_filename)
-
-    download_url, _ = cloudinary.utils.cloudinary_url(
-        public_id,
-        resource_type=resource_type or "raw",
-        type="upload",
-        flags=f"attachment:{safe_filename}"
-    )
-    return download_url
 
 
 # ======================
@@ -854,7 +837,8 @@ def student_assignments():
     cur.execute("""
         SELECT
             id, title, subject, "class" AS class, due_date,
-            COALESCE(original_filename, '') AS filename
+            COALESCE(original_filename, '') AS filename,
+            file_url
         FROM assignments
         WHERE "class" = %s
         ORDER BY id DESC
@@ -891,7 +875,8 @@ def student_tests():
     cur.execute("""
         SELECT
             id, test_name, subject, "class" AS class, test_date,
-            COALESCE(original_filename, '') AS filename
+            COALESCE(original_filename, '') AS filename,
+            file_url
         FROM tests
         WHERE "class" = %s
         ORDER BY id DESC
@@ -969,37 +954,30 @@ def download_assignment(assignment_id):
     if not student_required() and not admin_required():
         return redirect(url_for("login"))
 
-    conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute("""
-        SELECT file_url, original_filename, public_id, resource_type
-        FROM assignments
-        WHERE id = %s
-    """, (assignment_id,))
-    assignment = fetch_one_dict(cur)
+        cur.execute("""
+            SELECT file_url
+            FROM assignments
+            WHERE id = %s
+        """, (assignment_id,))
+        assignment = fetch_one_dict(cur)
 
-    cur.close()
-    conn.close()
+        cur.close()
+        conn.close()
 
-    if not assignment:
-        return "❌ Assignment not found"
+        if not assignment:
+            return "❌ Assignment not found"
 
-    if not assignment.get("file_url"):
-        return "❌ File URL missing for this assignment"
+        if not assignment.get("file_url"):
+            return "❌ File URL missing for this assignment"
 
-    filename = assignment.get("original_filename") or f"assignment_{assignment_id}"
+        return redirect(assignment["file_url"], code=302)
 
-    if assignment.get("public_id"):
-        download_url = get_cloudinary_download_url(
-            assignment["public_id"],
-            assignment.get("resource_type"),
-            filename
-        )
-        if download_url:
-            return redirect(download_url, code=302)
-
-    return redirect(assignment["file_url"], code=302)
+    except Exception as e:
+        return f"❌ Download error: {str(e)}"
 
 
 @app.route("/download/test/<int:test_id>")
@@ -1007,37 +985,30 @@ def download_test(test_id):
     if not student_required() and not admin_required():
         return redirect(url_for("login"))
 
-    conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute("""
-        SELECT file_url, original_filename, public_id, resource_type
-        FROM tests
-        WHERE id = %s
-    """, (test_id,))
-    test = fetch_one_dict(cur)
+        cur.execute("""
+            SELECT file_url
+            FROM tests
+            WHERE id = %s
+        """, (test_id,))
+        test = fetch_one_dict(cur)
 
-    cur.close()
-    conn.close()
+        cur.close()
+        conn.close()
 
-    if not test:
-        return "❌ Test not found"
+        if not test:
+            return "❌ Test not found"
 
-    if not test.get("file_url"):
-        return "❌ File URL missing for this test"
+        if not test.get("file_url"):
+            return "❌ File URL missing for this test"
 
-    filename = test.get("original_filename") or f"test_{test_id}"
+        return redirect(test["file_url"], code=302)
 
-    if test.get("public_id"):
-        download_url = get_cloudinary_download_url(
-            test["public_id"],
-            test.get("resource_type"),
-            filename
-        )
-        if download_url:
-            return redirect(download_url, code=302)
-
-    return redirect(test["file_url"], code=302)
+    except Exception as e:
+        return f"❌ Download error: {str(e)}"
 
 
 # ======================
