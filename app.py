@@ -934,34 +934,39 @@ def view_assignment(assignment_id):
     if not student_required() and not admin_required():
         return redirect(url_for("login"))
 
-    conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute("""
-        SELECT id, title, file_url, original_filename, public_id, resource_type
-        FROM assignments
-        WHERE id = %s
-    """, (assignment_id,))
-    assignment = fetch_one_dict(cur)
+        cur.execute("""
+            SELECT file_url, original_filename
+            FROM assignments
+            WHERE id = %s
+        """, (assignment_id,))
 
-    cur.close()
-    conn.close()
+        assignment = fetch_one_dict(cur)
 
-    if not assignment:
-        return "❌ Assignment not found"
+        cur.close()
+        conn.close()
 
-    if assignment.get("public_id"):
-        view_url, _ = cloudinary.utils.cloudinary_url(
-            assignment.get("public_id"),
-            resource_type=assignment.get("resource_type") or "raw",
-            type="upload"
+        if not assignment:
+            return "❌ Assignment not found"
+
+        file_url = assignment.get("file_url")
+
+        if not file_url:
+            return "❌ File URL missing"
+
+        response = requests.get(file_url)
+
+        return send_file(
+            io.BytesIO(response.content),
+            mimetype="application/pdf",
+            as_attachment=False
         )
-        return redirect(view_url, code=302)
 
-    if assignment.get("file_url"):
-        return redirect(assignment["file_url"], code=302)
-
-    return "❌ File URL missing for this assignment"
+    except Exception as e:
+        return f"❌ View error: {str(e)}"
 
 
 @app.route("/view/test/<int:test_id>")
@@ -969,34 +974,39 @@ def view_test(test_id):
     if not student_required() and not admin_required():
         return redirect(url_for("login"))
 
-    conn = get_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    try:
+        conn = get_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute("""
-        SELECT id, test_name, file_url, original_filename, public_id, resource_type
-        FROM tests
-        WHERE id = %s
-    """, (test_id,))
-    test = fetch_one_dict(cur)
+        cur.execute("""
+            SELECT file_url, original_filename
+            FROM tests
+            WHERE id = %s
+        """, (test_id,))
 
-    cur.close()
-    conn.close()
+        test = fetch_one_dict(cur)
 
-    if not test:
-        return "❌ Test not found"
+        cur.close()
+        conn.close()
 
-    if test.get("public_id"):
-        view_url, _ = cloudinary.utils.cloudinary_url(
-            test.get("public_id"),
-            resource_type=test.get("resource_type") or "raw",
-            type="upload"
+        if not test:
+            return "❌ Test not found"
+
+        file_url = test.get("file_url")
+
+        if not file_url:
+            return "❌ File URL missing"
+
+        response = requests.get(file_url)
+
+        return send_file(
+            io.BytesIO(response.content),
+            mimetype="application/pdf",
+            as_attachment=False
         )
-        return redirect(view_url, code=302)
 
-    if test.get("file_url"):
-        return redirect(test["file_url"], code=302)
-
-    return "❌ File URL missing for this test"
+    except Exception as e:
+        return f"❌ View error: {str(e)}"
 
 
 # ======================
