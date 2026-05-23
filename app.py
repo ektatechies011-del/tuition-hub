@@ -1,4 +1,6 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
+import io
+import requests
 import os
 from datetime import datetime
 import urllib.parse
@@ -1010,7 +1012,7 @@ def download_assignment(assignment_id):
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
         cur.execute("""
-            SELECT file_url, public_id, resource_type, original_filename
+            SELECT file_url, original_filename
             FROM assignments
             WHERE id = %s
         """, (assignment_id,))
@@ -1022,19 +1024,25 @@ def download_assignment(assignment_id):
         if not assignment:
             return "❌ Assignment not found"
 
-        if assignment.get("public_id"):
-            download_url = get_download_url(
-                assignment.get("public_id"),
-                assignment.get("resource_type"),
-                assignment.get("original_filename")
-            )
-            if download_url:
-                return redirect(download_url, code=302)
+        file_url = assignment.get("file_url")
+        filename = assignment.get("original_filename") or "assignment.pdf"
 
-        if assignment.get("file_url"):
-            return redirect(assignment["file_url"], code=302)
+        filename = filename.replace(" ", "_")
 
-        return "❌ File URL missing for this assignment"
+        if not filename.lower().endswith(".pdf"):
+            filename += ".pdf"
+
+        if not file_url:
+            return "❌ File URL missing"
+
+        response = requests.get(file_url)
+
+        return send_file(
+            io.BytesIO(response.content),
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=filename
+        )
 
     except Exception as e:
         return f"❌ Download error: {str(e)}"
@@ -1050,7 +1058,7 @@ def download_test(test_id):
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
         cur.execute("""
-            SELECT file_url, public_id, resource_type, original_filename
+            SELECT file_url, original_filename
             FROM tests
             WHERE id = %s
         """, (test_id,))
@@ -1062,19 +1070,25 @@ def download_test(test_id):
         if not test:
             return "❌ Test not found"
 
-        if test.get("public_id"):
-            download_url = get_download_url(
-                test.get("public_id"),
-                test.get("resource_type"),
-                test.get("original_filename")
-            )
-            if download_url:
-                return redirect(download_url, code=302)
+        file_url = test.get("file_url")
+        filename = test.get("original_filename") or "test.pdf"
 
-        if test.get("file_url"):
-            return redirect(test["file_url"], code=302)
+        filename = filename.replace(" ", "_")
 
-        return "❌ File URL missing for this test"
+        if not filename.lower().endswith(".pdf"):
+            filename += ".pdf"
+
+        if not file_url:
+            return "❌ File URL missing"
+
+        response = requests.get(file_url)
+
+        return send_file(
+            io.BytesIO(response.content),
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=filename
+        )
 
     except Exception as e:
         return f"❌ Download error: {str(e)}"
