@@ -182,17 +182,19 @@ def get_download_url(public_id, resource_type, original_filename):
         return ""
 
     filename = original_filename or "assignment.pdf"
-    if not filename.lower().endswith(".pdf"):
-        filename = f"{filename}.pdf"
 
-    safe_filename = urllib.parse.quote(filename)
+    filename = filename.replace(" ", "_")
+
+    if not filename.lower().endswith(".pdf"):
+        filename += ".pdf"
 
     download_url, _ = cloudinary.utils.cloudinary_url(
         public_id,
         resource_type=resource_type or "raw",
         type="upload",
-        flags=f"attachment:{safe_filename}"
+        attachment=True
     )
+
     return download_url
 
 
