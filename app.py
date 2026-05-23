@@ -13,7 +13,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 
-ALLOWED_EXTENSIONS = {"pdf", "doc", "docx", "png", "jpg", "jpeg"}
+ALLOWED_EXTENSIONS = {"pdf"}
 
 app = Flask(
     __name__,
@@ -62,14 +62,6 @@ def get_file_extension(filename):
 
 
 def get_cloudinary_resource_type(filename):
-    ext = get_file_extension(filename)
-
-    if ext in {"png", "jpg", "jpeg"}:
-        return "image"
-
-    if ext in {"pdf", "doc", "docx"}:
-        return "raw"
-
     return "raw"
 
 
@@ -189,7 +181,11 @@ def get_download_url(public_id, resource_type, original_filename):
     if not public_id:
         return ""
 
-    safe_filename = urllib.parse.quote(original_filename or "file")
+    filename = original_filename or "assignment.pdf"
+    if not filename.lower().endswith(".pdf"):
+        filename = f"{filename}.pdf"
+
+    safe_filename = urllib.parse.quote(filename)
 
     download_url, _ = cloudinary.utils.cloudinary_url(
         public_id,
@@ -518,7 +514,7 @@ def fix_student_users():
     conn = get_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute('SELECT username FROM students WHERE username IS NOT NULL AND username != ""')
+    cur.execute("SELECT username FROM students WHERE username IS NOT NULL AND username != ''")
     student_usernames = fetch_all_dicts(cur)
 
     added = 0
@@ -655,7 +651,7 @@ def admin_assignments():
 
         if file and file.filename:
             if not allowed_file(file.filename):
-                flash("Invalid file type. Allowed: pdf, doc, docx, png, jpg, jpeg", "danger")
+                flash("Only PDF files are allowed. Please upload a .pdf file.", "danger")
                 cur.close()
                 conn.close()
                 return redirect(url_for("admin_assignments"))
@@ -743,7 +739,7 @@ def admin_tests():
 
         if file and file.filename:
             if not allowed_file(file.filename):
-                flash("Invalid file type. Allowed: pdf, doc, docx, png, jpg, jpeg", "danger")
+                flash("Only PDF files are allowed. Please upload a .pdf file.", "danger")
                 cur.close()
                 conn.close()
                 return redirect(url_for("admin_tests"))
